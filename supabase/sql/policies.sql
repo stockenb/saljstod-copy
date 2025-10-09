@@ -1,5 +1,6 @@
 -- Enable RLS
 alter table public.profiles enable row level security;
+alter table public.customers enable row level security;
 alter table public.visit_reports enable row level security;
 alter table public.attachments enable row level security;
 alter table public.news_items enable row level security;
@@ -32,6 +33,19 @@ with check (owner_id = auth.uid());
 
 drop policy if exists "reports_admin_all" on public.visit_reports;
 create policy "reports_admin_all" on public.visit_reports
+for all
+using (public.is_admin(auth.uid()))
+with check (public.is_admin(auth.uid()));
+
+-- customers policies
+drop policy if exists "customers_owner_crud" on public.customers;
+create policy "customers_owner_crud" on public.customers
+for all
+using (owner_id = auth.uid())
+with check (owner_id = auth.uid());
+
+drop policy if exists "customers_admin_all" on public.customers;
+create policy "customers_admin_all" on public.customers
 for all
 using (public.is_admin(auth.uid()))
 with check (public.is_admin(auth.uid()));
