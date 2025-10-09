@@ -45,17 +45,6 @@ function loadEnv() {
       }
     }
 
-    // Stop after first matching env file to mimic Next.js behaviour.
-    break;
-  }
-}
-
-loadEnv();
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
 const USERS = [
   { email: "oliver.bentzer@nilsahlgren.se", role: "ADMIN" as const },
   { email: "info@dovas.se", role: "STANGSEL" as const },
