@@ -6,6 +6,15 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+const USERS = [
+  { email: "oliver.bentzer@nilsahlgren.se", role: "ADMIN" },
+  { email: "info@dovas.se", role: "STANGSEL" },
+  { email: "oskar.tylebrink@nilsahlgren.se", role: "SKRUV" },
+];
+
+/**
+ * Läser in en .env-fil i process.env om den inte redan har definierats.
+ */
 function loadEnv() {
   const candidates = [".env.local", ".env"];
   for (const file of candidates) {
@@ -45,39 +54,59 @@ function loadEnv() {
       }
     }
 
-const USERS = [
-  { email: "oliver.bentzer@nilsahlgren.se", role: "ADMIN" as const },
-  { email: "info@dovas.se", role: "STANGSEL" as const },
-  { email: "oskar.tylebrink@nilsahlgren.se", role: "SKRUV" as const },
-];
-
-type Role = "ADMIN" | "SKRUV" | "STANGSEL";
-
-async function upsertProfile(supabase: ReturnType<typeof createClient>, id: string, email: string, role: Role) {
-  await supabase.from("profiles").upsert({ id, email, name: email.split("@")[0], role });
+    // Stoppa efter första träffen för att matcha Next.js-beteende.
+    break;
+  }
 }
 
-async function inviteOne(supabase: ReturnType<typeof createClient>, email: string, role: Role) {
+loadEnv();
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+async function upsertProfile(supabase, id, email, role) {
+  const name = email.split("@")[0];
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id, email, name, role });
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function inviteOne(supabase, email, role) {
   const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${siteUrl}/auth/callback`,
   });
+
   if (inviteErr && inviteErr.message.includes("already registered")) {
-    // Already exists, fetch user id
-    const { data: users } = await supabase.auth.admin.listUsers();
+    const { data: users, error: listErr } = await supabase.auth.admin.listUsers();
+    if (listErr) {
+      throw listErr;
+    }
+
     const user = users?.users?.find((u) => u.email === email);
     if (user) {
       await upsertProfile(supabase, user.id, email, role);
     }
   } else if (invited?.user) {
     await upsertProfile(supabase, invited.user.id, email, role);
+  } else if (inviteErr) {
+    throw inviteErr;
   }
 
-  // Generate magic link in console (optional)
-  const { data: link } = await supabase.auth.admin.generateLink({
+  const { data: link, error: linkErr } = await supabase.auth.admin.generateLink({
     type: "magiclink",
     email,
     options: { redirectTo: `${siteUrl}/auth/callback` },
   });
+
+  if (linkErr) {
+    throw linkErr;
+  }
+
   if (link?.properties?.action_link) {
     console.log(`Magic link for ${email}:`, link.properties.action_link);
   }
@@ -87,6 +116,7 @@ async function main() {
   if (!url || !serviceKey) {
     throw new Error("Saknar NEXT_PUBLIC_SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY");
   }
+
   const supabase = createClient(url, serviceKey);
 
   for (const user of USERS) {
@@ -96,7 +126,7 @@ async function main() {
   console.log("Klart! Kolla konsolen för magiska länkar om du vill logga in direkt.");
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });
