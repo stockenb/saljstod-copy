@@ -6,16 +6,38 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique not null,
   name text,
-  role text check (role in ('ADMIN','SELLER')) not null default 'SELLER',
+  role text check (role in ('ADMIN','SKRUV','STANGSEL')) not null default 'SKRUV',
   created_at timestamptz default now()
+);
+
+-- customers
+create table if not exists public.customers (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null,
+  org_number text,
+  address_line text,
+  postal_code text,
+  city text,
+  email text,
+  phone text,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- visit_reports
 create table if not exists public.visit_reports (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.profiles(id),
+  customer_id uuid references public.customers(id) on delete set null,
   title text not null,
   customer text not null,
+  customer_address text,
+  customer_postal_code text,
+  customer_city text,
+  customer_email text,
+  customer_phone text,
   location text,
   visit_date timestamptz not null,
   attendees text,

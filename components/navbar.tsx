@@ -7,17 +7,18 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
-const nav = [
-  { href: "/", label: "Dashboard" },
-  { href: "/rapporter", label: "Rapporter" },
-  { href: "/nyheter", label: "Nyheter" },
-  { href: "/profil", label: "Profil" }
-];
-
 export function Navbar({ role }: { role?: string | null }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const nav = [
+    { href: "/", label: "Dashboard" },
+    ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/besoksrapporter", label: "Besöksrapporter" }] : []),
+    ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/rapporter", label: "Rapporter" }] : []),
+    { href: "/nyheter", label: "Nyheter" },
+    { href: "/profil", label: "Profil" },
+  ];
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-hairline backdrop-blur bg-white/70 dark:bg-neutral-950/70">
