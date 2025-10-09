@@ -34,7 +34,8 @@ export default function ReportsListPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [q, status]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [q, status]);
 
   function toCSV(rows: any[]) {
     const header = ["id","title","customer","status","next_step_due","tags","created_at"];
