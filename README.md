@@ -4,11 +4,11 @@ Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Rou
 
 ## Funktioner (MVP)
 - Magic link-inloggning (Supabase).
-- Dashboard med nyheter (pinnade först), kommande uppföljningar och senaste aktivitet (audit logg).
-- Besöksrapporter: lista med filter/sök, skapa/redigera, detalj med tidslinje, markera uppföljning klar, **Exportera CSV**.
+- Dashboard med nyheter (pinnade först) och rollanpassade moduler.
+- Besöksrapporter: kundregister, lista med filter/sök, skapa/redigera, detalj med tidslinje, markera uppföljning klar, **Exportera CSV/PDF**.
 - Nyheter: lista + detalj (Markdown), admin-CRUD under `/admin/nyheter` (**endast ADMIN**).
 - Profil & inställningar: e-post, roll, mörkt läge (lokalt).
-- Behörighet via `profiles.role` (ADMIN/SELLER) och RLS-policies.
+- Behörighet via `profiles.role` (ADMIN/SKRUV/STANGSEL) och RLS-policies.
 - Audit-loggar för viktiga händelser.
 
 ## Kom igång
@@ -41,8 +41,8 @@ npm run invite:users
 ```
 Fördefinierade konton:
 - ADMIN: `oliver.bentzer@nilsahlgren.se`
-- SELLER: `info@dovas.se`
-- SELLER: `oskar.tylebrink@nilsahlgren.se`
+- STANGSEL: `info@dovas.se`
+- SKRUV: `oskar.tylebrink@nilsahlgren.se`
 
 Alternativt: Supabase Dashboard → Auth → Users → **Invite**. Skapa sedan rader i `public.profiles` med rätt `id`/`email`/`role`.
 
@@ -65,7 +65,8 @@ Alternativt: Supabase Dashboard → Auth → Users → **Invite**. Skapa sedan r
 
 ## Behörighet & RLS
 - **ADMIN**: full åtkomst till rapporter + nyhets-CRUD.
-- **SELLER**: CRUD på egna rapporter, läsa nyheter.
+- **SKRUV**: Kundregister och rapporter för egna kunder.
+- **STANGSEL**: Dashboard med offertmodul (kommer snart) och nyheter.
 - Se `supabase/sql/policies.sql` för exakta policies.
 
 ## Tillgänglighet
