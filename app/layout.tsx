@@ -1,11 +1,15 @@
 import "../styles/globals.css";
-import { Inter } from "next/font/google";
+import { Work_Sans } from "next/font/google";
 import { ReactNode } from "react";
 import { createServerClientSupabase } from "@/lib/supabase/server";
 import { Navbar } from "@/components/navbar";
 import { site } from "@/config/site";
 
-const inter = Inter({ subsets: ["latin"] });
+const workSans = Work_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-work-sans"
+});
 
 export const metadata = {
   title: site.name,
@@ -23,11 +27,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang="sv" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={workSans.className}>
         {user ? <Navbar role={profile?.role} /> : null}
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-12 text-sm text-neutral-500">
-          © {new Date().getFullYear()} Säljstöd NA
+        <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:px-8 lg:px-10">{children}</main>
+        <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-16 text-sm text-neutral-500 sm:px-8 lg:px-10">
+          © {new Date().getFullYear()} Säljstöd NA. All rights reserved.
         </footer>
       </body>
     </html>
