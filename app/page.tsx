@@ -72,7 +72,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-3xl bg-white/95 p-8 shadow-card backdrop-blur-sm dark:bg-neutral-900/80">
+      <section className="rounded-3xl border border-surface-border/80 bg-white/90 p-8 shadow-card backdrop-blur-sm dark:border-surface-dark-border/60 dark:bg-neutral-900/80">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
@@ -109,7 +109,7 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/60 bg-white/70 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900/70">
+            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Mina uppgifter</span>
               <div className="mt-3 text-3xl font-semibold text-neutral-900 dark:text-white">{upcoming.length}</div>
               <p className="mt-1 text-sm text-neutral-500">
@@ -118,10 +118,7 @@ export default async function HomePage() {
               {upcoming.length ? (
                 <ul className="mt-3 space-y-2 text-sm">
                   {upcoming.slice(0, 2).map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-white/80 px-3 py-2 text-neutral-700 shadow-sm transition duration-calm ease-calm hover:border-primary/50 dark:bg-neutral-900/70 dark:text-neutral-200"
-                    >
+                    <li key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50/80 px-3 py-2 text-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-200">
                       <Link href={`/rapporter/${item.id}`} className="font-medium text-primary hover:underline">
                         {item.title}
                       </Link>
@@ -135,7 +132,7 @@ export default async function HomePage() {
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/60 bg-white/70 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900/70">
+            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Senaste nyhet</span>
               {latestNews ? (
                 <>
@@ -160,40 +157,40 @@ export default async function HomePage() {
                 <p className="mt-3 text-sm text-neutral-500">Inga publicerade nyheter ännu.</p>
               )}
             </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/60 bg-white/70 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900/70">
+            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Snabblänkar</span>
-              <div className="mt-3 flex flex-col gap-1.5">
+              <div className="mt-3 flex flex-col gap-2">
                 {quickLinks.slice(0, 3).map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="group flex items-start justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm text-neutral-700 transition duration-calm ease-calm hover:bg-primary/10 hover:text-primary dark:text-neutral-200 dark:hover:bg-primary/20"
+                    className="group flex items-start justify-between gap-3 rounded-2xl border border-surface-border/80 bg-white/80 px-4 py-3 text-left text-sm text-neutral-700 transition duration-calm ease-calm hover:border-primary hover:text-primary dark:border-surface-dark-border/60 dark:bg-neutral-900/80 dark:text-neutral-200"
                   >
                     <span>
                       <span className="block font-semibold text-neutral-900 group-hover:text-primary dark:text-white">{link.label}</span>
                       <span className="text-xs text-neutral-500 group-hover:text-primary/80 dark:text-neutral-400">{link.description}</span>
                     </span>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-primary dark:text-neutral-400" />
+                    <ArrowUpRight className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-primary" />
                   </Link>
                 ))}
               </div>
             </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/60 bg-white/70 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary/70 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900/70">
+            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Nyckeltal</span>
-              <div className="mt-3 space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <div className="mt-3 space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
                 {(role === "SKRUV" || role === "ADMIN") && (
-                  <div className="space-y-2 rounded-xl border border-surface-border/60 bg-white/80 p-3 text-sm shadow-sm dark:border-surface-dark-border/50 dark:bg-neutral-900/70">
-                    <div className="flex items-center justify-between text-success">
+                  <>
+                    <div className="flex items-center justify-between rounded-2xl bg-success-subtle/60 px-4 py-3 text-success">
                       <span className="font-semibold text-success">Kunder</span>
                       <span className="text-base font-semibold">{customerCount ?? 0}</span>
                     </div>
-                    <div className="flex items-center justify-between text-primary">
+                    <div className="flex items-center justify-between rounded-2xl bg-primary-50/80 px-4 py-3 text-primary">
                       <span className="font-semibold">Rapporter</span>
                       <span className="text-base font-semibold">{reportCount ?? 0}</span>
                     </div>
-                  </div>
+                  </>
                 )}
-                <div className="flex items-center justify-between pt-1 text-neutral-700 dark:text-neutral-100">
+                <div className="flex items-center justify-between rounded-2xl bg-neutral-100/80 px-4 py-3 text-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-100">
                   <span className="font-semibold">Inloggad som</span>
                   <span className="text-sm font-medium">{profile?.email}</span>
                 </div>
@@ -210,7 +207,7 @@ export default async function HomePage() {
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-8">
           {(role === "SKRUV" || role === "ADMIN") && (
-            <Card className="border border-surface-border/70 bg-white/80 shadow-card-sm dark:border-surface-dark-border/60 dark:bg-neutral-900/70">
+            <Card>
               <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <CardTitle>Besöksrapporter</CardTitle>
@@ -226,10 +223,10 @@ export default async function HomePage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Link
                     href="/besoksrapporter"
-                    className="group flex flex-col gap-1.5 rounded-xl px-4 py-4 transition duration-calm ease-calm hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20"
+                    className="group flex flex-col gap-2 rounded-2xl border border-surface-border/70 bg-white/90 p-5 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80"
                   >
                     <span className="text-sm font-semibold text-neutral-900 group-hover:text-primary dark:text-white">Kundregister</span>
                     <span className="text-sm text-neutral-500 group-hover:text-primary/80">
@@ -238,7 +235,7 @@ export default async function HomePage() {
                   </Link>
                   <Link
                     href="/rapporter"
-                    className="group flex flex-col gap-1.5 rounded-xl px-4 py-4 transition duration-calm ease-calm hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20"
+                    className="group flex flex-col gap-2 rounded-2xl border border-surface-border/70 bg-white/90 p-5 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80"
                   >
                     <span className="text-sm font-semibold text-neutral-900 group-hover:text-primary dark:text-white">Rapporter</span>
                     <span className="text-sm text-neutral-500 group-hover:text-primary/80">
@@ -251,10 +248,7 @@ export default async function HomePage() {
                   {upcoming.length ? (
                     <ul className="space-y-2 text-sm">
                       {upcoming.map((item) => (
-                        <li
-                          key={item.id}
-                          className="group flex items-center justify-between gap-4 border-b border-surface-border/60 py-3 text-neutral-700 last:border-b-0 last:pb-0 dark:border-surface-dark-border/50 dark:text-neutral-200"
-                        >
+                        <li key={item.id} className="group flex items-center justify-between gap-4 rounded-2xl border border-surface-border/70 bg-white/90 px-4 py-3 transition duration-calm ease-calm hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80">
                           <div>
                             <Link href={`/rapporter/${item.id}`} className="font-medium text-neutral-900 group-hover:text-primary dark:text-white">
                               {item.title}
@@ -291,6 +285,31 @@ export default async function HomePage() {
             </Card>
           )}
 
+          {role === "ADMIN" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Senaste aktivitet</CardTitle>
+                <CardDescription>Överblick över senaste händelser i systemet.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-2 text-sm">
+                  {audits.length ? (
+                    audits.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between gap-4 rounded-2xl border border-surface-border/70 bg-white/90 px-4 py-3 text-neutral-700 dark:border-surface-dark-border/60 dark:bg-neutral-900/80 dark:text-neutral-200">
+                        <span>
+                          <span className="font-semibold text-neutral-900 dark:text-white">{a.action}</span> · {a.entity}
+                          {a.entity_id ? ` #${a.entity_id}` : ""}
+                        </span>
+                        <span className="text-xs font-medium text-neutral-500">{formatDate(a.created_at)}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <p className="text-neutral-500">Ingen aktivitet registrerad.</p>
+                  )}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <aside className="space-y-6">
