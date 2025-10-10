@@ -13,7 +13,7 @@ export function Navbar({ role }: { role?: string | null }) {
   useEffect(() => setMounted(true), []);
 
   const nav = [
-    { href: "/", label: "Dashboard" },
+    { href: "/", label: "Hem" },
     ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/besoksrapporter", label: "Besöksrapporter" }] : []),
     ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/rapporter", label: "Rapporter" }] : []),
     { href: "/nyheter", label: "Nyheter" },

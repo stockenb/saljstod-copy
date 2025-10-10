@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default async function DashboardPage() {
+export default async function HomePage() {
   const supabase = createServerClientSupabase();
   const {
     data: { user },
@@ -38,16 +38,6 @@ export default async function DashboardPage() {
     const { count: reports } = await supabase.from("visit_reports").select("id", { count: "exact", head: true });
     customerCount = customers ?? 0;
     reportCount = reports ?? 0;
-  }
-
-  let audits: any[] = [];
-  if (role === "ADMIN") {
-    const { data: auditData } = await supabase
-      .from("audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(8);
-    audits = auditData ?? [];
   }
 
   const latestNews = news?.[0];
