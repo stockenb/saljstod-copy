@@ -27,44 +27,57 @@ export default async function CustomersPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-      <section className="space-y-4">
-        <header>
-          <h1 className="text-2xl font-semibold">Kundregister</h1>
-          <p className="text-sm text-neutral-500">Se och hantera dina kunder inför besök och uppföljningar.</p>
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+      <section className="space-y-6">
+        <header className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Kunder</span>
+          <h1>Kundregister</h1>
+          <p className="max-w-2xl text-sm text-neutral-500">
+            Se och hantera dina kunder inför besök och uppföljningar. Klicka på en kund för att öppna detaljer och rapporter.
+          </p>
         </header>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {customers?.length ? (
             customers.map((customer) => (
-              <Card key={customer.id} className="border border-neutral-200">
-                <CardContent className="p-4">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <Link href={`/besoksrapporter/${customer.id}`} className="text-lg font-semibold hover:underline">
+              <Card
+                key={customer.id}
+                className="border border-surface-border/80 bg-white/90 p-0 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80"
+              >
+                <CardContent className="space-y-4 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <Link
+                        href={`/besoksrapporter/${customer.id}`}
+                        className="text-lg font-semibold leading-snug text-neutral-900 hover:text-primary hover:underline dark:text-white"
+                      >
                         {customer.name}
                       </Link>
-                      <p className="text-sm text-neutral-500">
+                      <div className="text-sm text-neutral-500">
                         {customer.address_line ? `${customer.address_line}, ` : ""}
                         {customer.postal_code ? `${customer.postal_code} ` : ""}
                         {customer.city ?? ""}
-                      </p>
-                      <p className="text-xs text-neutral-500">Skapad {formatDate(customer.created_at)}</p>
+                      </div>
+                      <div className="text-xs text-neutral-400">Skapad {formatDate(customer.created_at)}</div>
                     </div>
-                    <div className="space-y-1 text-sm text-neutral-600">
-                      {customer.email ? <div>{customer.email}</div> : null}
-                      {customer.phone ? <div>{customer.phone}</div> : null}
+                    <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
+                      {customer.email ? (
+                        <span className="pill-chip">{customer.email}</span>
+                      ) : null}
+                      {customer.phone ? (
+                        <span className="pill-chip">{customer.phone}</span>
+                      ) : null}
                     </div>
                   </div>
                   {customer.notes ? (
-                    <p className="mt-3 text-sm text-neutral-600">{customer.notes}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300">{customer.notes}</p>
                   ) : null}
                 </CardContent>
               </Card>
             ))
           ) : (
             <Card>
-              <CardContent className="p-6 text-sm text-neutral-500">Inga kunder registrerade ännu.</CardContent>
+              <CardContent className="p-8 text-sm text-neutral-500">Inga kunder registrerade ännu.</CardContent>
             </Card>
           )}
         </div>
@@ -77,41 +90,41 @@ export default async function CustomersPage() {
             <CardDescription>Lägg till en kund innan du skapar din besöksrapport.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={create} className="space-y-3">
-              <div>
-                <label className="text-sm">Företagsnamn</label>
+            <form action={create} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Företagsnamn</label>
                 <Input name="name" required placeholder="Ex: Kund AB" />
               </div>
-              <div>
-                <label className="text-sm">Organisationsnummer</label>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Organisationsnummer</label>
                 <Input name="org_number" placeholder="Ex: 559999-1234" />
               </div>
-              <div>
-                <label className="text-sm">Adress</label>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Adress</label>
                 <Input name="address_line" placeholder="Gatuadress" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm">Postnummer</label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Postnummer</label>
                   <Input name="postal_code" placeholder="123 45" />
                 </div>
-                <div>
-                  <label className="text-sm">Ort</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Ort</label>
                   <Input name="city" placeholder="Ort" />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm">E-post</label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">E-post</label>
                   <Input type="email" name="email" placeholder="kontakt@kund.se" />
                 </div>
-                <div>
-                  <label className="text-sm">Telefon</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Telefon</label>
                   <Input name="phone" placeholder="08-123 45 67" />
                 </div>
               </div>
-              <div>
-                <label className="text-sm">Anteckningar</label>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Anteckningar</label>
                 <Textarea name="notes" placeholder="Övrig information" rows={4} />
               </div>
               <Button type="submit" className="w-full">
