@@ -22,17 +22,17 @@ export default async function HomePage() {
     .order("published_at", { ascending: false })
     .limit(6);
 
-  let upcoming: any[] = [];
+  let audits: any[] = [];
   let customerCount: number | null = null;
   let reportCount: number | null = null;
   if (role === "SKRUV" || role === "ADMIN") {
-    const { data: upcomingData } = await supabase
+    const { data: auditData } = await supabase
       .from("visit_reports")
       .select("id,title,customer,next_step_due")
       .gte("next_step_due", new Date().toISOString().slice(0, 10))
       .order("next_step_due", { ascending: true })
       .limit(4);
-    upcoming = upcomingData ?? [];
+    audits = auditData ?? [];
 
     const { count: customers } = await supabase.from("customers").select("id", { count: "exact", head: true });
     const { count: reports } = await supabase.from("visit_reports").select("id", { count: "exact", head: true });
