@@ -34,78 +34,60 @@ export function Navbar({ role }: { role?: string | null }) {
   }, [segments]);
 
   return (
-    <header className="sticky top-0 z-50 w-full shadow-card">
-      <div className="border-b border-primary/20 bg-primary text-white backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-4 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
-          <div className="flex w-full items-center justify-between gap-6">
-            <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-              <span className="leading-tight">
-                Säljstöd - Nils Ahlgren AB
-                <span className="block text-xs font-normal uppercase tracking-[0.3em] text-white/60">Säljstöd - Nils Ahlgren AB</span>
-              </span>
-            </Link>
-            <form action="/logout" method="post" className="flex items-center gap-2 lg:hidden">
-              <Button type="submit" size="sm" variant="contrast">
-                <LogOut className="mr-2 h-4 w-4" /> Logga ut
-              </Button>
-            </form>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:justify-end">
-            <nav className="flex flex-1 flex-wrap items-center gap-2 lg:flex-none lg:gap-3">
-              {nav.map((n) => {
-                const isActive = pathname === n.href;
-                return (
-                  <Link
-                    key={n.href}
-                    href={n.href}
-                    className={cn(
-                      "group relative flex items-center gap-2 rounded-pill px-4 py-2 text-sm font-medium text-white/80 transition duration-calm ease-calm hover:bg-white/10 hover:text-white",
-                      isActive && "bg-white/15 text-white shadow-inset"
-                    )}
-                  >
-                    <span>{n.label}</span>
-                    {isActive && <span className="absolute -bottom-[0.15rem] left-4 right-4 h-1 rounded-pill bg-white/80" />}
-                  </Link>
-                );
-              })}
-              {mounted && role === "ADMIN" && (
-                <Link
-                  href="/admin/nyheter"
-                  className={cn(
-                    "group relative flex items-center gap-2 rounded-pill px-4 py-2 text-sm font-medium text-white/80 transition duration-calm ease-calm hover:bg-white/10 hover:text-white",
-                    pathname.startsWith("/admin") && "bg-white/15 text-white shadow-inset"
-                  )}
-                >
-                  Admin
-                  {pathname.startsWith("/admin") && (
-                    <span className="absolute -bottom-[0.15rem] left-4 right-4 h-1 rounded-pill bg-white/80" />
-                  )}
-                </Link>
+    <header className="sticky top-0 z-50 w-full border-b border-white/60 bg-white/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-4 text-sm text-neutral-600 sm:px-8 lg:flex-nowrap lg:px-10">
+        <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-neutral-900">
+          Säljstöd
+        </Link>
+        <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
+          {nav.map((n) => {
+            const isActive = pathname === n.href;
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={cn(
+                  "flex items-center gap-2 rounded-full px-3 py-1.5 transition duration-200 ease-out",
+                  isActive
+                    ? "bg-neutral-900 text-white shadow"
+                    : "text-neutral-500 hover:text-neutral-900"
+                )}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
+          {mounted && role === "ADMIN" && (
+            <Link
+              href="/admin/nyheter"
+              className={cn(
+                "flex items-center gap-2 rounded-full px-3 py-1.5 transition duration-200 ease-out",
+                pathname.startsWith("/admin") ? "bg-neutral-900 text-white shadow" : "text-neutral-500 hover:text-neutral-900"
               )}
-            </nav>
-            <form action="/logout" method="post" className="hidden lg:block">
-              <Button type="submit" variant="contrast">
-                <LogOut className="mr-2 h-4 w-4" /> Logga ut
-              </Button>
-            </form>
-          </div>
-        </div>
+            >
+              Admin
+            </Link>
+          )}
+        </nav>
+        <form action="/logout" method="post" className="ml-auto">
+          <Button type="submit" size="sm" variant="secondary" className="rounded-full border border-neutral-200 bg-white/80 text-neutral-700 shadow-sm hover:border-neutral-300 hover:bg-white">
+            <LogOut className="mr-2 h-4 w-4" /> Logga ut
+          </Button>
+        </form>
       </div>
       {breadcrumbItems.length ? (
-        <div className="border-b border-primary/20 bg-primary-600/10 py-2">
-          <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 text-xs font-medium text-white/80 sm:px-8 lg:px-10">
-            <Link href="/" className="text-white/80 hover:text-white">
+        <div className="border-t border-white/70 bg-white/60 py-2">
+          <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 text-xs font-medium text-neutral-500 sm:px-8 lg:px-10">
+            <Link href="/" className="text-neutral-500 hover:text-neutral-800">
               Hem
             </Link>
             {breadcrumbItems.map((item, index) => (
               <span key={item.href} className="flex items-center gap-2">
-                <span aria-hidden className="text-white/40">
-                  /
-                </span>
+                <span aria-hidden className="text-neutral-300">/</span>
                 {index === breadcrumbItems.length - 1 ? (
-                  <span className="text-white">{item.label}</span>
+                  <span className="text-neutral-800">{item.label}</span>
                 ) : (
-                  <Link href={item.href} className="text-white/80 hover:text-white">
+                  <Link href={item.href} className="text-neutral-500 hover:text-neutral-800">
                     {item.label}
                   </Link>
                 )}
