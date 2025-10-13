@@ -42,10 +42,22 @@ create table if not exists public.visit_reports (
   visit_date timestamptz not null,
   attendees text,
   notes text,
-  status text check (status in ('Öppet','Vann','Förlorat')) default 'Öppet',
+  status text check (status in ('Öppet','Vann','Förlorat')),
   next_step text,
   next_step_due date,
   tags text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- customer_contacts
+create table if not exists public.customer_contacts (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  name text not null,
+  role text,
+  email text,
+  phone text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

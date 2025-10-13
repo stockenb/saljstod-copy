@@ -141,7 +141,12 @@ export default async function ReportDetail({ params }: { params: { id: string } 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="block space-y-1">
             <span className="text-sm">Status</span>
-            <select name="status" defaultValue={report.status} className="h-11 w-full rounded-2xl border border-neutral-300 px-3">
+            <select
+              name="status"
+              defaultValue={report.status ?? ""}
+              className="h-11 w-full rounded-2xl border border-neutral-300 px-3"
+            >
+              <option value="">Ingen status</option>
               <option>Öppet</option>
               <option>Vann</option>
               <option>Förlorat</option>

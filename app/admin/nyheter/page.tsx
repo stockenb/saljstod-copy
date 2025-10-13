@@ -31,8 +31,8 @@ export default async function AdminNewsPage() {
         <form action={action} className="space-y-3">
           <input type="hidden" name="id" />
           <label className="block space-y-1">
-            <span className="text-sm">Slug</span>
-            <Input name="slug" placeholder="unik-slug" required />
+            <span className="text-sm">Slug (valfritt)</span>
+            <Input name="slug" placeholder="unik-slug" />
           </label>
           <label className="block space-y-1">
             <span className="text-sm">Titel</span>

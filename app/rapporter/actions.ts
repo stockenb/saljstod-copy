@@ -9,6 +9,7 @@ export async function createReport(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Inte inloggad");
 
+  const statusValue = String(formData.get("status") || "").trim();
   const payload = {
     owner_id: user.id,
     title: String(formData.get("title") || ""),
@@ -23,7 +24,7 @@ export async function createReport(formData: FormData) {
     visit_date: new Date(String(formData.get("visit_date") || new Date().toISOString())),
     attendees: String(formData.get("attendees") || ""),
     notes: String(formData.get("notes") || ""),
-    status: String(formData.get("status") || "Öppet"),
+    status: statusValue ? statusValue : null,
     next_step: String(formData.get("next_step") || ""),
     next_step_due: formData.get("next_step_due") ? String(formData.get("next_step_due")) : null,
     tags: (String(formData.get("tags") || "").split(",").map((t) => t.trim()).filter(Boolean)) as any,
@@ -38,6 +39,7 @@ export async function createReport(formData: FormData) {
 
 export async function updateReport(id: string, formData: FormData) {
   const supabase = createServerClientSupabase();
+  const statusValue = String(formData.get("status") || "").trim();
   const payload: any = {
     title: String(formData.get("title") || ""),
     customer: String(formData.get("customer") || ""),
@@ -51,7 +53,7 @@ export async function updateReport(id: string, formData: FormData) {
     visit_date: new Date(String(formData.get("visit_date") || new Date().toISOString())),
     attendees: String(formData.get("attendees") || ""),
     notes: String(formData.get("notes") || ""),
-    status: String(formData.get("status") || "Öppet"),
+    status: statusValue ? statusValue : null,
     next_step: String(formData.get("next_step") || ""),
     next_step_due: formData.get("next_step_due") ? String(formData.get("next_step_due")) : null,
     updated_at: new Date(),
