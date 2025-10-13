@@ -22,7 +22,6 @@ export default async function HomePage() {
     .order("published_at", { ascending: false })
     .limit(6);
 
-  let audits: any[] = [];
   let upcoming: any[] = [];
   let customerCount: number | null = null;
   let reportCount: number | null = null;
@@ -34,21 +33,12 @@ export default async function HomePage() {
       .gte("next_step_due", new Date().toISOString().slice(0, 10))
       .order("next_step_due", { ascending: true })
       .limit(4);
-    audits = upcomingData ?? [];
+    upcoming = upcomingData ?? [];
 
     const { count: customers } = await supabase.from("customers").select("id", { count: "exact", head: true });
     const { count: reports } = await supabase.from("visit_reports").select("id", { count: "exact", head: true });
     customerCount = customers ?? 0;
     reportCount = reports ?? 0;
-  }
-
-    if (role === "ADMIN") {
-    const { data: auditData } = await supabase
-      .from("audit_logs")
-      .select("id, action, entity, entity_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(6);
-    audits = auditData ?? [];
   }
 
 
@@ -297,31 +287,6 @@ export default async function HomePage() {
             </Card>
           )}
 
-          {role === "ADMIN" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Senaste aktivitet</CardTitle>
-                <CardDescription>Överblick över senaste händelser i systemet.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ol className="space-y-2 text-sm">
-                  {audits.length ? (
-                    audits.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between gap-4 rounded-2xl border border-surface-border/70 bg-white/90 px-4 py-3 text-neutral-700 dark:border-surface-dark-border/60 dark:bg-neutral-900/80 dark:text-neutral-200">
-                        <span>
-                          <span className="font-semibold text-neutral-900 dark:text-white">{a.action}</span> · {a.entity}
-                          {a.entity_id ? ` #${a.entity_id}` : ""}
-                        </span>
-                        <span className="text-xs font-medium text-neutral-500">{formatDate(a.created_at)}</span>
-                      </li>
-                    ))
-                  ) : (
-                    <p className="text-neutral-500">Ingen aktivitet registrerad.</p>
-                  )}
-                </ol>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         <aside className="space-y-6">
