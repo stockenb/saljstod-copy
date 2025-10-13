@@ -78,19 +78,14 @@ export default async function HomePage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Idag</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Nils Ahlgren AB</span>
               <h1 className="text-3xl font-semibold text-neutral-900 dark:text-white">
                 Hej {profile?.name ?? profile?.email}!
               </h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500 dark:text-neutral-300">
                 <span>{formatDate(today)}</span>
-                <span aria-hidden className="hidden sm:inline">
-                  ·
-                </span>
-                <span className="flex items-center gap-2">
-                  Roll
-                  <Badge variant="neutral">{role}</Badge>
-                </span>
+
+
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -192,10 +187,7 @@ export default async function HomePage() {
                     </div>
                   </>
                 )}
-                <div className="flex items-center justify-between rounded-2xl bg-neutral-100/80 px-4 py-3 text-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-100">
-                  <span className="font-semibold">Inloggad som</span>
-                  <span className="text-sm font-medium">{profile?.email}</span>
-                </div>
+
               </div>
               <Link href="/profil" className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                 Visa profil

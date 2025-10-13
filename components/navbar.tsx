@@ -39,12 +39,9 @@ export function Navbar({ role }: { role?: string | null }) {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-4 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <div className="flex w-full items-center justify-between gap-6">
             <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-base font-bold text-white">
-                NA
-              </span>
               <span className="leading-tight">
-                Säljstöd
-                <span className="block text-xs font-normal uppercase tracking-[0.3em] text-white/60">Intranät</span>
+                Säljstöd - Nils Ahlgren AB
+                <span className="block text-xs font-normal uppercase tracking-[0.3em] text-white/60">Säljstöd - Nils Ahlgren AB</span>
               </span>
             </Link>
             <form action="/logout" method="post" className="flex items-center gap-2 lg:hidden">
