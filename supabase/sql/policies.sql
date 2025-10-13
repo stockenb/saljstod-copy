@@ -2,6 +2,7 @@
 alter table public.profiles enable row level security;
 alter table public.customers enable row level security;
 alter table public.visit_reports enable row level security;
+alter table public.customer_contacts enable row level security;
 alter table public.attachments enable row level security;
 alter table public.news_items enable row level security;
 alter table public.news_reads enable row level security;
@@ -46,6 +47,33 @@ with check (owner_id = auth.uid());
 
 drop policy if exists "customers_admin_all" on public.customers;
 create policy "customers_admin_all" on public.customers
+for all
+using (public.is_admin(auth.uid()))
+with check (public.is_admin(auth.uid()));
+
+-- customer_contacts policies
+drop policy if exists "contacts_owner_crud" on public.customer_contacts;
+create policy "contacts_owner_crud" on public.customer_contacts
+for all
+using (
+  exists (
+    select 1
+    from public.customers c
+    where c.id = customer_id
+      and (c.owner_id = auth.uid() or public.is_admin(auth.uid()))
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.customers c
+    where c.id = customer_id
+      and (c.owner_id = auth.uid() or public.is_admin(auth.uid()))
+  )
+);
+
+drop policy if exists "contacts_admin_all" on public.customer_contacts;
+create policy "contacts_admin_all" on public.customer_contacts
 for all
 using (public.is_admin(auth.uid()))
 with check (public.is_admin(auth.uid()));

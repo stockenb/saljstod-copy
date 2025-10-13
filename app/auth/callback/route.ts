@@ -6,12 +6,35 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
-  if (code) {
-    const supabase = createServerClientSupabase();
-    await supabase.auth.exchangeCodeForSession(code);
-    return NextResponse.redirect(`${origin}${next}`);
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
   }
 
-  // Ogiltig eller utgången länk
-  return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  const supabase = createServerClientSupabase();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile || profileError) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(`${origin}/login?error=unauthorized`);
+  }
+
+  return NextResponse.redirect(`${origin}${next}`);
 }

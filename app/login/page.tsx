@@ -1,15 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sent" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (!errorParam) return;
+
+    setStatus("error");
+    if (errorParam === "unauthorized") {
+      setMessage("Din e-postadress är inte behörig att logga in. Kontakta administratören.");
+      return;
+    }
+
+    if (errorParam === "invalid_link") {
+      setMessage("Din inloggningslänk är ogiltig eller har gått ut. Be om en ny.");
+      return;
+    }
+
+    setMessage("Något gick fel. Försök igen.");
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
