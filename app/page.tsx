@@ -73,188 +73,199 @@ export default async function HomePage() {
   ].filter(Boolean) as { href: string; label: string; description: string }[];
 
   return (
-    <div className="space-y-10">
-      <section className="rounded-3xl border border-surface-border/80 bg-white/90 p-8 shadow-card backdrop-blur-sm dark:border-surface-dark-border/60 dark:bg-neutral-900/80">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-12">
+      <section className="overflow-hidden rounded-[32px] border border-white/60 bg-gradient-to-br from-white/95 via-white/80 to-primary-50/40 p-10 shadow-[0_35px_80px_-60px_rgba(15,23,42,0.45)] backdrop-blur-xl dark:border-white/10 dark:from-neutral-900/90 dark:via-neutral-900/80 dark:to-neutral-900/60">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <div className="space-y-8">
             <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Nils Ahlgren AB</span>
-              <h1 className="text-3xl font-semibold text-neutral-900 dark:text-white">
-                Hej {profile?.name ?? profile?.email}!
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500 dark:text-neutral-300">
-                <span>{formatDate(today)}</span>
-
-
-              </div>
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-400">Nils Ahlgren AB</span>
+              <h1 className="text-3xl font-semibold text-neutral-900 dark:text-white">Hej {profile?.name ?? profile?.email}!</h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-300">{formatDate(today)}</p>
             </div>
             <div className="flex flex-wrap gap-3">
               {(role === "SKRUV" || role === "ADMIN") && (
                 <Link
                   href="/rapporter/ny"
-                  className="inline-flex items-center justify-center gap-2 rounded-pill bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-card transition duration-calm ease-calm hover:bg-accent-600"
+                  className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 ease-out hover:bg-neutral-700"
                 >
                   Skapa rapport
                 </Link>
               )}
               <Link
                 href="/nyheter"
-                className="inline-flex items-center justify-center gap-2 rounded-pill border border-primary/80 px-5 py-2.5 text-sm font-semibold text-primary transition duration-calm ease-calm hover:bg-primary-50"
+                className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-700 transition duration-200 ease-out hover:border-neutral-400 hover:text-neutral-900"
               >
                 Alla nyheter
               </Link>
             </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Mina uppgifter</span>
-              <div className="mt-3 text-3xl font-semibold text-neutral-900 dark:text-white">{upcoming.length}</div>
-              <p className="mt-1 text-sm text-neutral-500">
-                {upcoming.length ? "Planerade uppföljningar framöver" : "Inga planerade uppföljningar just nu."}
-              </p>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Kommande uppföljningar</p>
               {upcoming.length ? (
-                <ul className="mt-3 space-y-2 text-sm">
-                  {upcoming.slice(0, 2).map((item) => (
-                    <li key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50/80 px-3 py-2 text-neutral-700 dark:bg-neutral-800/70 dark:text-neutral-200">
-                      <Link href={`/rapporter/${item.id}`} className="font-medium text-primary hover:underline">
-                        {item.title}
-                      </Link>
-                      <span className="text-xs text-neutral-500">{item.next_step_due}</span>
+                <ul className="space-y-2 text-sm text-neutral-600 dark:text-neutral-300">
+                  {upcoming.slice(0, 3).map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-4 border-b border-white/60 pb-2 last:border-b-0 last:pb-0 dark:border-white/10">
+                      <div>
+                        <Link href={`/rapporter/${item.id}`} className="font-medium text-neutral-900 transition hover:text-primary dark:text-white">
+                          {item.title}
+                        </Link>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">{item.customer}</p>
+                      </div>
+                      <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">{item.next_step_due}</span>
                     </li>
                   ))}
                 </ul>
-              ) : null}
-              <Link href="/rapporter" className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+              ) : (
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Inga planerade uppföljningar just nu.</p>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-neutral-900/60">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Planering</span>
+              <div className="mt-3 text-3xl font-semibold text-neutral-900 dark:text-white">{upcoming.length}</div>
+              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                {upcoming.length ? "Planerade uppföljningar framöver" : "Inga planerade uppföljningar just nu."}
+              </p>
+              <Link
+                href="/rapporter"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition hover:text-primary dark:text-neutral-200"
+              >
                 Gå till rapporter
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Senaste nyhet</span>
+            <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-neutral-900/60">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Senaste nyhet</span>
               {latestNews ? (
-                <>
-                  <Link href={`/nyheter/${latestNews.slug}`} className="mt-3 text-lg font-semibold leading-snug text-neutral-900 hover:underline dark:text-white">
+                <div className="mt-3 space-y-3">
+                  <Link href={`/nyheter/${latestNews.slug}`} className="text-lg font-semibold leading-snug text-neutral-900 transition hover:text-primary dark:text-white">
                     {latestNews.title}
                   </Link>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                     <span>{formatDate(latestNews.published_at)}</span>
-                    {latestNews.pinned ? <Badge variant="info">Pinnad</Badge> : null}
+                    {latestNews.pinned ? <Badge variant="info" className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">Pinnad</Badge> : null}
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {latestNews.categories?.map((c: string) => (
-                      <Badge key={c}>{c}</Badge>
+                      <Badge key={c} className="bg-white/60 text-neutral-600 ring-1 ring-white/60 dark:bg-neutral-800/70 dark:text-neutral-200 dark:ring-white/10">
+                        {c}
+                      </Badge>
                     ))}
                   </div>
-                  <Link href={`/nyheter/${latestNews.slug}`} className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                  <Link
+                    href={`/nyheter/${latestNews.slug}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition hover:text-primary dark:text-neutral-200"
+                  >
                     Läs mer
                     <ArrowUpRight className="h-4 w-4" />
                   </Link>
-                </>
+                </div>
               ) : (
-                <p className="mt-3 text-sm text-neutral-500">Inga publicerade nyheter ännu.</p>
+                <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">Inga publicerade nyheter ännu.</p>
               )}
             </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Snabblänkar</span>
-              <div className="mt-3 flex flex-col gap-2">
-                {quickLinks.slice(0, 3).map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="group flex items-start justify-between gap-3 rounded-2xl border border-surface-border/80 bg-white/80 px-4 py-3 text-left text-sm text-neutral-700 transition duration-calm ease-calm hover:border-primary hover:text-primary dark:border-surface-dark-border/60 dark:bg-neutral-900/80 dark:text-neutral-200"
-                  >
-                    <span>
-                      <span className="block font-semibold text-neutral-900 group-hover:text-primary dark:text-white">{link.label}</span>
-                      <span className="text-xs text-neutral-500 group-hover:text-primary/80 dark:text-neutral-400">{link.description}</span>
-                    </span>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-primary" />
-                  </Link>
-                ))}
-              </div>
-            </div>
-            <div className="flex h-full flex-col rounded-2xl border border-surface-border/70 bg-white/90 p-5 shadow-sm transition duration-calm ease-calm hover:-translate-y-0.5 hover:shadow-card-hover dark:border-surface-dark-border/50 dark:bg-neutral-900">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Nyckeltal</span>
-              <div className="mt-3 space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
+            <div className="sm:col-span-2 rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-neutral-900/60">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Snabblänkar</span>
+                  <ul className="mt-3 grid gap-2 text-sm text-neutral-600 dark:text-neutral-300 md:grid-cols-2">
+                    {quickLinks.map((link) => (
+                      <li key={link.href} className="group space-y-1">
+                        <Link
+                          href={link.href}
+                          className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 transition hover:bg-white hover:text-neutral-900 dark:hover:bg-neutral-800"
+                        >
+                          <span className="font-medium text-neutral-700 group-hover:text-neutral-900 dark:text-neutral-200 dark:group-hover:text-white">
+                            {link.label}
+                          </span>
+                          <ArrowUpRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-500 dark:text-neutral-500 dark:group-hover:text-neutral-300" />
+                        </Link>
+                        <p className="px-3 text-xs text-neutral-400 transition group-hover:text-neutral-500 dark:text-neutral-500">
+                          {link.description}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 {(role === "SKRUV" || role === "ADMIN") && (
-                  <>
-                    <div className="flex items-center justify-between rounded-2xl bg-success-subtle/60 px-4 py-3 text-success">
-                      <span className="font-semibold text-success">Kunder</span>
-                      <span className="text-base font-semibold">{customerCount ?? 0}</span>
+                  <div className="flex shrink-0 flex-col gap-3 rounded-2xl bg-white/60 p-4 text-sm text-neutral-600 shadow-sm ring-1 ring-white/70 dark:bg-neutral-900/70 dark:text-neutral-200 dark:ring-white/10">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Kunder</span>
+                      <p className="mt-1 text-2xl font-semibold text-neutral-900 dark:text-white">{customerCount ?? 0}</p>
                     </div>
-                    <div className="flex items-center justify-between rounded-2xl bg-primary-50/80 px-4 py-3 text-primary">
-                      <span className="font-semibold">Rapporter</span>
-                      <span className="text-base font-semibold">{reportCount ?? 0}</span>
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Rapporter</span>
+                      <p className="mt-1 text-2xl font-semibold text-neutral-900 dark:text-white">{reportCount ?? 0}</p>
                     </div>
-                  </>
+                    <Link href="/profil" className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition hover:text-primary dark:text-neutral-200">
+                      Visa profil
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </div>
                 )}
-
               </div>
-              <Link href="/profil" className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                Visa profil
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-10 xl:grid-cols-[minmax(0,1.85fr)_minmax(0,1.15fr)]">
         <div className="space-y-8">
           {(role === "SKRUV" || role === "ADMIN") && (
-            <Card>
-              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <CardTitle>Besöksrapporter</CardTitle>
+            <Card className="bg-white/80 shadow-none ring-1 ring-black/5 backdrop-blur-sm dark:bg-neutral-900/60 dark:ring-white/10">
+              <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl">Besöksrapporter</CardTitle>
                   <CardDescription>Hantera kunder och följ upp nästa steg.</CardDescription>
                 </div>
-                <div className="flex gap-3 text-sm text-neutral-500">
-                  <span className="rounded-pill bg-neutral-100 px-3 py-1 font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+                <div className="flex flex-wrap gap-2 text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  <span className="rounded-full bg-white px-3 py-1 text-neutral-700 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800/80 dark:text-neutral-200 dark:ring-white/10">
                     {customerCount ?? 0} kunder
                   </span>
-                  <span className="rounded-pill bg-neutral-100 px-3 py-1 font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+                  <span className="rounded-full bg-white px-3 py-1 text-neutral-700 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800/80 dark:text-neutral-200 dark:ring-white/10">
                     {reportCount ?? 0} rapporter
                   </span>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
+              <CardContent className="space-y-8 text-sm text-neutral-600 dark:text-neutral-300">
+                <div className="grid gap-2 text-sm md:grid-cols-2">
                   <Link
                     href="/besoksrapporter"
-                    className="group flex flex-col gap-2 rounded-2xl border border-surface-border/70 bg-white/90 p-5 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80"
+                    className="group flex items-center justify-between gap-3 rounded-xl px-4 py-3 transition hover:bg-white hover:text-neutral-900 dark:hover:bg-neutral-800"
                   >
-                    <span className="text-sm font-semibold text-neutral-900 group-hover:text-primary dark:text-white">Kundregister</span>
-                    <span className="text-sm text-neutral-500 group-hover:text-primary/80">
-                      Se befintliga kunder och lägg till nya poster.
+                    <span className="font-medium text-neutral-700 group-hover:text-neutral-900 dark:text-neutral-200 dark:group-hover:text-white">
+                      Kundregister
                     </span>
+                    <ArrowUpRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-500 dark:text-neutral-500 dark:group-hover:text-neutral-300" />
                   </Link>
                   <Link
                     href="/rapporter"
-                    className="group flex flex-col gap-2 rounded-2xl border border-surface-border/70 bg-white/90 p-5 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80"
+                    className="group flex items-center justify-between gap-3 rounded-xl px-4 py-3 transition hover:bg-white hover:text-neutral-900 dark:hover:bg-neutral-800"
                   >
-                    <span className="text-sm font-semibold text-neutral-900 group-hover:text-primary dark:text-white">Rapporter</span>
-                    <span className="text-sm text-neutral-500 group-hover:text-primary/80">
-                      Samlad vy över alla besöksrapporter och status.
+                    <span className="font-medium text-neutral-700 group-hover:text-neutral-900 dark:text-neutral-200 dark:group-hover:text-white">
+                      Rapporter
                     </span>
+                    <ArrowUpRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-500 dark:text-neutral-500 dark:group-hover:text-neutral-300" />
                   </Link>
                 </div>
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Kommande uppföljningar</div>
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Kommande uppföljningar</div>
                   {upcoming.length ? (
-                    <ul className="space-y-2 text-sm">
+                    <ul className="divide-y divide-neutral-200/70 rounded-2xl border border-neutral-200/60 bg-white/70 text-sm shadow-sm dark:divide-white/10 dark:border-white/10 dark:bg-neutral-900/40">
                       {upcoming.map((item) => (
-                        <li key={item.id} className="group flex items-center justify-between gap-4 rounded-2xl border border-surface-border/70 bg-white/90 px-4 py-3 transition duration-calm ease-calm hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80">
+                        <li key={item.id} className="flex items-center justify-between gap-4 px-4 py-3">
                           <div>
-                            <Link href={`/rapporter/${item.id}`} className="font-medium text-neutral-900 group-hover:text-primary dark:text-white">
+                            <Link href={`/rapporter/${item.id}`} className="font-medium text-neutral-900 transition hover:text-primary dark:text-white">
                               {item.title}
                             </Link>
-                            <p className="text-xs text-neutral-500">{item.customer}</p>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400">{item.customer}</p>
                           </div>
-                          <span className="text-xs font-medium text-neutral-500">{item.next_step_due}</span>
+                          <span className="text-xs font-medium text-neutral-400 dark:text-neutral-500">{item.next_step_due}</span>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-sm text-neutral-500">Inga planerade uppföljningar.</p>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">Inga planerade uppföljningar.</p>
                   )}
                 </div>
               </CardContent>
@@ -262,27 +273,26 @@ export default async function HomePage() {
           )}
 
           {role === "STANGSEL" && (
-            <Card>
+            <Card className="bg-white/80 shadow-none ring-1 ring-black/5 backdrop-blur-sm dark:bg-neutral-900/60 dark:ring-white/10">
               <CardHeader>
                 <CardTitle>Skapa offert</CardTitle>
                 <CardDescription>Stödet för offertskapande lanseras snart.</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-neutral-500">Kommer snart</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Kommer snart</p>
               </CardContent>
               <CardFooter>
-                <Link href="/nyheter" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                <Link href="/nyheter" className="inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition hover:text-primary dark:text-neutral-200">
                   Håll dig uppdaterad via nyheterna
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
               </CardFooter>
             </Card>
           )}
-
         </div>
 
         <aside className="space-y-6">
-          <Card>
+          <Card className="bg-white/80 shadow-none ring-1 ring-black/5 backdrop-blur-sm dark:bg-neutral-900/60 dark:ring-white/10">
             <CardHeader>
               <CardTitle>Nyheter</CardTitle>
             </CardHeader>
@@ -292,21 +302,23 @@ export default async function HomePage() {
                   <header className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       {latestNews.categories?.map((c: string) => (
-                        <Badge key={c}>{c}</Badge>
+                        <Badge key={c} className="bg-white/60 text-neutral-600 ring-1 ring-white/60 dark:bg-neutral-800/70 dark:text-neutral-200 dark:ring-white/10">
+                          {c}
+                        </Badge>
                       ))}
-                      {latestNews.pinned ? <Badge variant="info">Pinnad</Badge> : null}
+                      {latestNews.pinned ? <Badge variant="info" className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">Pinnad</Badge> : null}
                     </div>
-                    <Link href={`/nyheter/${latestNews.slug}`} className="text-xl font-semibold leading-tight text-neutral-900 hover:text-primary hover:underline dark:text-white">
+                    <Link href={`/nyheter/${latestNews.slug}`} className="text-xl font-semibold leading-tight text-neutral-900 transition hover:text-primary dark:text-white">
                       {latestNews.title}
                     </Link>
-                    <p className="text-xs text-neutral-500">{formatDate(latestNews.published_at)}</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">{formatDate(latestNews.published_at)}</p>
                   </header>
                   <ReactMarkdown className="prose prose-sm max-w-none text-neutral-600 dark:text-neutral-300">
                     {latestNews.content}
                   </ReactMarkdown>
                 </article>
               ) : (
-                <p className="text-sm text-neutral-500">Inga nyheter än.</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Inga nyheter än.</p>
               )}
             </CardContent>
           </Card>
@@ -314,22 +326,25 @@ export default async function HomePage() {
           {olderNews.length ? (
             <div className="grid gap-4">
               {olderNews.map((item) => (
-                <Card key={item.id} className="border border-surface-border/80 bg-white/90 p-0 transition duration-calm ease-calm hover:-translate-y-0.5 hover:border-primary hover:shadow-card-hover dark:border-surface-dark-border/60 dark:bg-neutral-900/80">
+                <Card
+                  key={item.id}
+                  className="bg-white/70 p-0 shadow-none ring-1 ring-black/5 transition duration-200 ease-out hover:-translate-y-0.5 hover:ring-neutral-400/40 dark:bg-neutral-900/60 dark:ring-white/10 dark:hover:ring-white/20"
+                >
                   <CardContent className="space-y-3 p-5">
                     <div className="flex flex-wrap items-center gap-2">
                       {item.categories?.map((c: string) => (
-                        <Badge key={c} variant="neutral">
+                        <Badge key={c} className="bg-white/60 text-neutral-600 ring-1 ring-white/60 dark:bg-neutral-800/70 dark:text-neutral-200 dark:ring-white/10">
                           {c}
                         </Badge>
                       ))}
                     </div>
                     <div>
                       <div className="font-semibold text-neutral-900 dark:text-white">{item.title}</div>
-                      <p className="text-xs text-neutral-500">{formatDate(item.published_at)}</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">{formatDate(item.published_at)}</p>
                     </div>
                     <Link
                       href={`/nyheter/${item.slug}`}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition hover:text-primary dark:text-neutral-200"
                     >
                       Läs mer
                       <ArrowUpRight className="h-4 w-4" />

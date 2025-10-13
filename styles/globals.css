@@ -22,7 +22,7 @@
 
   body {
     @apply min-h-screen bg-surface text-neutral-800 dark:bg-surface-dark-default dark:text-neutral-100 transition-colors duration-300 ease-calm;
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 248, 251, 0.98));
+    background-image: linear-gradient(135deg, rgba(243, 244, 248, 0.95), rgba(228, 233, 243, 0.9));
   }
 
   .dark body {
