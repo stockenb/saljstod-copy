@@ -24,6 +24,7 @@ Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Rou
 3) Skapa tabeller + policies (kör i Supabase SQL Editor):
    - Kör `supabase/sql/schema.sql`
    - Kör `supabase/sql/policies.sql`
+   - Om du satte upp databasen innan 2024-05-22, kör även patchen `supabase/sql/patches/20240522_customer_contacts.sql` för att lägga till kontaktpersoner-tabellen.
 4) Installera beroenden:
    ```bash
    npm i
