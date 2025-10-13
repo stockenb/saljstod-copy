@@ -23,22 +23,34 @@ export default async function HomePage() {
     .limit(6);
 
   let audits: any[] = [];
+  let upcoming: any[] = [];
   let customerCount: number | null = null;
   let reportCount: number | null = null;
   if (role === "SKRUV" || role === "ADMIN") {
-    const { data: auditData } = await supabase
+    const { data: upcomingData } = await supabase
+
       .from("visit_reports")
       .select("id,title,customer,next_step_due")
       .gte("next_step_due", new Date().toISOString().slice(0, 10))
       .order("next_step_due", { ascending: true })
       .limit(4);
-    audits = auditData ?? [];
+    audits = upcomingData ?? [];
 
     const { count: customers } = await supabase.from("customers").select("id", { count: "exact", head: true });
     const { count: reports } = await supabase.from("visit_reports").select("id", { count: "exact", head: true });
     customerCount = customers ?? 0;
     reportCount = reports ?? 0;
   }
+
+    if (role === "ADMIN") {
+    const { data: auditData } = await supabase
+      .from("audit_logs")
+      .select("id, action, entity, entity_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(6);
+    audits = auditData ?? [];
+  }
+
 
   const latestNews = news?.[0];
   const olderNews = news?.slice(1) ?? [];
