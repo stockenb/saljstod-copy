@@ -4,6 +4,16 @@ import { revalidatePath } from "next/cache";
 import { createServerClientSupabase } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
 export async function markRead(news_id: string) {
   const supabase = createServerClientSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -15,9 +25,22 @@ export async function markRead(news_id: string) {
 export async function upsertNews(formData: FormData) {
   const supabase = createServerClientSupabase();
   const id = String(formData.get("id") || "");
+  const title = String(formData.get("title") || "").trim();
+  let slug = String(formData.get("slug") || "").trim();
+  if (!slug && id) {
+    const { data: existing } = await supabase.from("news_items").select("slug").eq("id", id).maybeSingle();
+    if (existing?.slug) slug = existing.slug;
+  }
+  if (!slug) {
+    const now = new Date();
+    const datePart = now.toISOString().slice(0, 10);
+    const base = slugify(title || "nyhet") || "nyhet";
+    const suffix = now.getTime().toString(36).slice(-4);
+    slug = `${datePart}-${base}-${suffix}`;
+  }
   const payload: any = {
-    slug: String(formData.get("slug") || ""),
-    title: String(formData.get("title") || ""),
+    slug,
+    title,
     content: String(formData.get("content") || ""),
     categories: (String(formData.get("categories") || "").split(",").map((t) => t.trim()).filter(Boolean)) as any,
     pinned: String(formData.get("pinned") || "") === "on",

@@ -171,7 +171,8 @@ export function NewReportForm({ action, customers, selectedCustomer }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className="text-sm">Status</label>
-            <select name="status" className="h-11 w-full rounded-2xl border border-neutral-300 px-3">
+            <select name="status" className="h-11 w-full rounded-2xl border border-neutral-300 px-3" defaultValue="">
+              <option value="">Ingen status</option>
               <option>Öppet</option>
               <option>Vann</option>
               <option>Förlorat</option>

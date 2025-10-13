@@ -11,7 +11,7 @@ type Report = {
   id: string;
   title: string;
   customer: string;
-  status: string;
+  status: string | null;
   next_step_due: string | null;
   tags: string[] | null;
   created_at: string;
@@ -110,7 +110,7 @@ export default function ReportsListPage() {
                 <th>Titel</th>
                 <th>Kund</th>
                 <th>Status</th>
-                <th>Nästa steg</th>
+                <th>Datum</th>
               </tr>
             </thead>
             <tbody>
@@ -125,19 +125,40 @@ export default function ReportsListPage() {
                         <Badge key={t}>{t}</Badge>
                       ))}
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <Link
+                        href={`/rapporter/${r.id}`}
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-neutral-300 px-3 py-1 font-medium text-neutral-700 transition duration-calm ease-calm hover:border-primary hover:text-primary"
+                      >
+                        Redigera
+                      </Link>
+                      <Link
+                        href={`/rapporter/${r.id}/visa`}
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-neutral-300 px-3 py-1 font-medium text-neutral-700 transition duration-calm ease-calm hover:border-primary hover:text-primary"
+                      >
+                        Visa
+                      </Link>
+                      <a
+                        href={`/api/reports/${r.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-neutral-300 px-3 py-1 font-medium text-neutral-700 transition duration-calm ease-calm hover:border-primary hover:text-primary"
+                      >
+                        Ladda ned
+                      </a>
+                    </div>
                   </td>
                   <td>{r.customer}</td>
                   <td>
-                    <Badge variant={r.status === "Vann" ? "success" : r.status === "Förlorat" ? "danger" : "neutral"}>
-                      {r.status}
-                    </Badge>
+                    {r.status ? (
+                      <Badge variant={r.status === "Vann" ? "success" : r.status === "Förlorat" ? "danger" : "neutral"}>
+                        {r.status}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-neutral-400">-</span>
+                    )}
                   </td>
-                  <td className="text-xs text-neutral-500">
-                    {r.next_step_due ? new Date(r.next_step_due).toLocaleDateString("sv-SE") : "-"}
-                    <div className="text-[0.7rem] text-neutral-400">
-                      {new Date(r.created_at).toLocaleDateString("sv-SE")}
-                    </div>
-                  </td>
+                  <td className="text-xs text-neutral-500">{new Date(r.created_at).toLocaleDateString("sv-SE")}</td>
                 </tr>
               ))}
             </tbody>

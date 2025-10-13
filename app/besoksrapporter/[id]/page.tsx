@@ -9,7 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { deleteCustomer, updateCustomer } from "../actions";
+import {
+  createCustomerContact,
+  deleteCustomer,
+  deleteCustomerContact,
+  updateCustomer,
+  updateCustomerContact,
+} from "../actions";
 
 export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerClientSupabase();
@@ -26,6 +32,12 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
     .eq("customer_id", params.id)
     .order("visit_date", { ascending: false });
 
+  const { data: contacts } = await supabase
+    .from("customer_contacts")
+    .select("id,name,role,email,phone,created_at,updated_at")
+    .eq("customer_id", params.id)
+    .order("name", { ascending: true });
+
   async function update(formData: FormData) {
     "use server";
     await updateCustomer(params.id, formData);
@@ -35,6 +47,21 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
     "use server";
     await deleteCustomer(params.id);
     redirect("/besoksrapporter");
+  }
+
+  async function addContact(formData: FormData) {
+    "use server";
+    await createCustomerContact(params.id, formData);
+  }
+
+  async function saveContact(contactId: string, formData: FormData) {
+    "use server";
+    await updateCustomerContact(params.id, contactId, formData);
+  }
+
+  async function removeContact(contactId: string) {
+    "use server";
+    await deleteCustomerContact(params.id, contactId);
   }
 
   return (
@@ -133,6 +160,89 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
             >
               Skapa besöksrapport
             </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Referenspersoner</CardTitle>
+            <CardDescription>Nyckelkontakter hos kunden.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {contacts?.length ? (
+              <div className="space-y-3">
+                {contacts.map((contact) => (
+                  <form
+                    key={contact.id}
+                    action={saveContact.bind(null, contact.id)}
+                    className="space-y-3 rounded-2xl border border-neutral-200 p-4 dark:border-neutral-700"
+                  >
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Namn</label>
+                      <Input name="name" defaultValue={contact.name} required />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Roll</label>
+                        <Input name="role" defaultValue={contact.role ?? ""} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Telefon</label>
+                        <Input name="phone" defaultValue={contact.phone ?? ""} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">E-post</label>
+                      <Input type="email" name="email" defaultValue={contact.email ?? ""} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" size="sm">
+                        Spara
+                      </Button>
+                      <Button
+                        formAction={removeContact.bind(null, contact.id)}
+                        formMethod="post"
+                        formNoValidate
+                        type="submit"
+                        variant="ghost"
+                        size="sm"
+                      >
+                        Ta bort
+                      </Button>
+                    </div>
+                  </form>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-500">Inga referenspersoner tillagda ännu.</p>
+            )}
+
+            <div className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-700">
+              <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Lägg till referensperson</h3>
+              <form action={addContact} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Namn</label>
+                  <Input name="name" required placeholder="Namn" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Roll</label>
+                    <Input name="role" placeholder="Roll" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Telefon</label>
+                    <Input name="phone" placeholder="08-123 45 67" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">E-post</label>
+                  <Input type="email" name="email" placeholder="namn@kund.se" />
+                </div>
+                <Button type="submit" size="sm">
+                  Lägg till
+                </Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       </div>
