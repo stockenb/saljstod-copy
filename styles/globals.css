@@ -2,39 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS-variabler för enkel justering av tema */
-:root {
-  --radius: 14px;
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  :root {
+    --radius: 18px;
+  }
+
+  html {
+    @apply bg-surface text-surface-foreground font-sans antialiased;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    @apply bg-surface-dark-default text-neutral-100;
+  }
+
+  body {
+    @apply min-h-screen bg-surface text-neutral-800 dark:bg-surface-dark-default dark:text-neutral-100 transition-colors duration-300 ease-calm;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 248, 251, 0.98));
+  }
+
+  .dark body {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.95));
+  }
+
+  a {
+    @apply text-primary-600 underline-offset-4 transition-colors duration-calm ease-calm;
+  }
+
+  a:hover {
+    @apply text-primary;
+  }
+
+  :where(button, a, input, textarea, select):focus-visible {
+    outline: 3px solid rgba(0, 51, 161, 0.6);
+    outline-offset: 3px;
+  }
+
+  h1 {
+    @apply font-heading text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white;
+  }
+
+  h2 {
+    @apply font-heading text-2xl font-semibold text-neutral-900 dark:text-white;
+  }
+
+  h3 {
+    @apply font-heading text-xl font-semibold text-neutral-900 dark:text-neutral-50;
+  }
 }
 
-html {
-  color-scheme: light;
-}
+@layer components {
+  .hr {
+    @apply border-t border-hairline;
+  }
 
-html.dark {
-  color-scheme: dark;
-}
+  .card {
+    @apply rounded-2xl border border-surface-border bg-surface-subtle shadow-card transition duration-calm ease-calm hover:shadow-card-hover hover:-translate-y-0.5 dark:border-surface-dark-border dark:bg-neutral-900;
+  }
 
-body {
-  @apply bg-white text-neutral-900 antialiased;
-}
+  .pill-chip {
+    @apply inline-flex items-center gap-1 rounded-pill border border-surface-border bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-wide text-neutral-600 shadow-sm dark:border-surface-dark-border dark:bg-neutral-900/80 dark:text-neutral-200;
+  }
 
-.dark body {
-  @apply bg-neutral-950 text-neutral-50;
-}
+  .table-shell {
+    @apply w-full overflow-hidden rounded-2xl border border-surface-border bg-surface-subtle dark:border-surface-dark-border dark:bg-neutral-900;
+  }
 
-/* Fokusstilar */
-:where(button, a, input, textarea, select):focus-visible {
-  outline: 2px solid #0033A1;
-  outline-offset: 2px;
-}
+  table.data-table {
+    @apply w-full border-collapse text-sm;
+  }
 
-/* Små hairlines */
-.hr {
-  @apply border-t border-hairline;
-}
+  table.data-table thead th {
+    @apply bg-neutral-50/80 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-800/80 dark:text-neutral-200;
+  }
 
-/* Kort */
-.card {
-  @apply rounded-2xl shadow-card border border-hairline bg-white dark:bg-neutral-900;
+  table.data-table tbody tr:nth-child(odd) {
+    @apply bg-white/80 dark:bg-neutral-900/60;
+  }
+
+  table.data-table tbody tr:nth-child(even) {
+    @apply bg-neutral-50/50 dark:bg-neutral-900/30;
+  }
+
+  table.data-table td {
+    @apply px-4 py-3 align-middle text-neutral-700 dark:text-neutral-200;
+  }
+
+  table.data-table tr:hover {
+    @apply bg-primary-50/60 dark:bg-neutral-800/70;
+  }
 }
