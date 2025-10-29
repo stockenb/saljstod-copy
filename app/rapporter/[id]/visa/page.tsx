@@ -32,7 +32,7 @@ export default async function ReportViewPage({ params }: { params: { id: string 
           <h1 className="text-2xl font-semibold text-neutral-900 dark:text-white">{report.title}</h1>
           <p className="text-sm text-neutral-500">Översikt över rapporten och dess innehåll.</p>
           <div className="flex flex-wrap items-center gap-2 pt-2">
-            {(report.tags ?? []).map((tag) => (
+            {(report.tags ?? []).map((tag: string) => (
               <Badge key={tag}>{tag}</Badge>
             ))}
           </div>

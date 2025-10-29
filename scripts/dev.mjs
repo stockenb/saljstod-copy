@@ -23,7 +23,7 @@ function startCommand({ name, script, color }) {
   const child = spawn(npmCmd, ['run', script], {
     env: process.env,
     stdio: ['inherit', 'pipe', 'pipe'],
-    shell: false,
+    shell: process.platform === 'win32',
   });
 
   if (child.stdout) {
