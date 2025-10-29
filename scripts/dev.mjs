@@ -3,8 +3,7 @@ import { spawn } from 'node:child_process';
 import process from 'node:process';
 import readline from 'node:readline';
 
-const isWindows = process.platform === 'win32';
-const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const commands = [
   { name: 'main', script: 'dev:main', color: '\x1b[32m' },
@@ -23,8 +22,8 @@ function logLine(prefix, color, line) {
 function startCommand({ name, script, color }) {
   const child = spawn(npmCmd, ['run', script], {
     env: process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: isWindows,
+    stdio: ['inherit', 'pipe', 'pipe'],
+    shell: false,
   });
 
   if (child.stdout) {
