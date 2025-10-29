@@ -35,6 +35,11 @@ Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Rou
    npm run dev
    ```
 
+   Kommandot ovan startar nu både huvudappen (port **3000**) och de fristående
+   kalkylatorerna för villastängsel (**3001**) respektive industristängsel
+   (**3002**) i samma terminal. Vill du köra enbart huvudappen kan du använda
+   `npm run dev:main`.
+
 ### Skicka invites / magiska länkar (rekommenderat)
 Scriptet skapar användarna och sätter deras roll i `profiles`:
 ```bash
