@@ -1,6 +1,14 @@
 import Link from "next/link";
 
-const primaryCards = [
+type Card = {
+  href: string;
+  title: string;
+  description: string;
+  emoji: string;
+  variant?: "compact";
+};
+
+const primaryCards: Card[] = [
   {
     href: "https://karta.nilsahlgren.se",
     title: "Villastängsel",
@@ -27,7 +35,7 @@ const primaryCards = [
   },
 ];
 
-const secondaryCards = [
+const secondaryCards: Card[] = [
   {
     href: "https://karta.nilsahlgren.se",
     title: "EAN",
@@ -36,8 +44,6 @@ const secondaryCards = [
     variant: "compact" as const,
   },
 ];
-
-type Card = (typeof primaryCards)[number] | (typeof secondaryCards)[number];
 
 function CardLink({ card }: { card: Card }) {
   const isCompact = card.variant === "compact";
