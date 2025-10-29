@@ -9,9 +9,21 @@ const cards = [
   },
   {
     href: "https://karta.nilsahlgren.se",
-    title: "Paneler",
-    description: "Samlad information om panelprojekt.",
-    emoji: "🧱",
+    title: "Villastängsel",
+    description: "Planeringsstöd och resurser för villastängsel.",
+    emoji: "🏡",
+  },
+  {
+    href: "https://karta.nilsahlgren.se",
+    title: "Industristängsel",
+    description: "Projektunderlag och översikter för industristängsel.",
+    emoji: "🏭",
+  },
+  {
+    href: "https://karta.nilsahlgren.se",
+    title: "Panelstängsel",
+    description: "Samlad information om panelstängselprojekt.",
+    emoji: "⛓️",
   },
   {
     href: "https://karta.nilsahlgren.se",
