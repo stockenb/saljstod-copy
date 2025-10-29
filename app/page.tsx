@@ -2,16 +2,23 @@ import Link from "next/link";
 
 const cards = [
   {
-    href: "/villastangsel",
-    title: "Villastangsel",
-    description: "Intranätsverktyg för villastängsel.",
-    emoji: "🏡",
+    href: "https://karta.nilsahlgren.se",
+    title: "Viltstängsel",
+    description: "Resurser och verktyg för viltstängsel.",
+    emoji: "🦌",
   },
   {
-    href: "/industristangsel",
-    title: "Industristangsel",
-    description: "Intranätsverktyg för industristängsel.",
-    emoji: "🏭",
+    href: "https://karta.nilsahlgren.se",
+    title: "Paneler",
+    description: "Samlad information om panelprojekt.",
+    emoji: "🧱",
+  },
+  {
+    href: "https://karta.nilsahlgren.se",
+    title: "EAN",
+    description: "Snabb åtkomst till EAN-uppslag.",
+    emoji: "🏷️",
+    variant: "compact" as const,
   },
 ];
 
@@ -25,24 +32,36 @@ export default function HomePage() {
             Välj vilket intranätsverktyg du vill öppna.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          {cards.map((card) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className="group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
-            >
-              <div className="text-4xl" aria-hidden>
-                {card.emoji}
-              </div>
-              <h2 className="mt-4 text-xl font-semibold text-neutral-900">{card.title}</h2>
-              <p className="mt-2 text-sm text-neutral-600">{card.description}</p>
-              <span className="mt-auto inline-flex items-center gap-1 pt-6 text-sm font-medium text-neutral-900">
-                Öppna
-                <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              </span>
-            </Link>
-          ))}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => {
+            const isCompact = card.variant === "compact";
+
+            return (
+              <Link
+                key={`${card.title}-${card.href}`}
+                href={card.href}
+                target="_blank"
+                rel="noreferrer"
+                className={`group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 ${isCompact ? "p-4" : "p-6"}`}
+              >
+                <div className={isCompact ? "text-3xl" : "text-4xl"} aria-hidden>
+                  {card.emoji}
+                </div>
+                <h2 className={`mt-4 font-semibold text-neutral-900 ${isCompact ? "text-lg" : "text-xl"}`}>
+                  {card.title}
+                </h2>
+                <p className={`mt-2 text-neutral-600 ${isCompact ? "text-xs" : "text-sm"}`}>
+                  {card.description}
+                </p>
+                <span
+                  className={`mt-auto inline-flex items-center gap-1 pt-6 font-medium text-neutral-900 ${isCompact ? "text-xs" : "text-sm"}`}
+                >
+                  Öppna
+                  <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </main>
