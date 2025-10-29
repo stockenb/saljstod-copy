@@ -5,8 +5,6 @@
   "scripts": {
     "dev": "node ./scripts/dev.mjs",
     "dev:main": "next dev",
-    "dev:villastangsel": "npm run dev --prefix apps/villastangsel -- --port 3001",
-    "dev:industristangsel": "npm run dev --prefix apps/industristangsel -- --port 3002",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

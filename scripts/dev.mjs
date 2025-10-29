@@ -5,11 +5,7 @@ import readline from 'node:readline';
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-const commands = [
-  { name: 'main', script: 'dev:main', color: '\x1b[32m' },
-  { name: 'villa', script: 'dev:villastangsel', color: '\x1b[36m' },
-  { name: 'industri', script: 'dev:industristangsel', color: '\x1b[35m' },
-];
+const commands = [{ name: 'main', script: 'dev:main', color: '\x1b[32m' }];
 
 const children = [];
 let shuttingDown = false;
