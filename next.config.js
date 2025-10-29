@@ -8,8 +8,14 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      { source: "/villastangsel/:path*", destination: "http://localhost:3001/villastangsel/:path*" },
-      { source: "/industristangsel/:path*", destination: "http://localhost:3002/industristangsel/:path*" }
+      {
+        source: "/villastangsel/:path*",
+        destination: "http://localhost:3001/:path*"
+      },
+      {
+        source: "/industristangsel/:path*",
+        destination: "http://localhost:3002/:path*"
+      }
     ];
   }
 };
