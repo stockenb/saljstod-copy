@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE || "",
-  { auth: { persistSession: false } }
-);
-
 export async function POST(req: Request) {
   try {
+    const supabaseUrl =
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const serviceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || "";
+
+    if (!supabaseUrl || !serviceKey) {
+      console.error("search-log error: missing Supabase configuration");
+      return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
     const { q, result, lat, lng, source } = await req.json();
 
     const ua = req.headers.get("user-agent") || null;

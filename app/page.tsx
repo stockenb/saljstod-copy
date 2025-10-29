@@ -1,12 +1,6 @@
 import Link from "next/link";
 
-const cards = [
-  {
-    href: "https://karta.nilsahlgren.se",
-    title: "Viltstängsel",
-    description: "Resurser och verktyg för viltstängsel.",
-    emoji: "🦌",
-  },
+const primaryCards = [
   {
     href: "https://karta.nilsahlgren.se",
     title: "Villastängsel",
@@ -27,12 +21,56 @@ const cards = [
   },
   {
     href: "https://karta.nilsahlgren.se",
+    title: "Viltstängsel",
+    description: "Resurser och verktyg för viltstängsel.",
+    emoji: "🦌",
+  },
+];
+
+const secondaryCards = [
+  {
+    href: "https://karta.nilsahlgren.se",
     title: "EAN",
     description: "Snabb åtkomst till EAN-uppslag.",
     emoji: "🏷️",
     variant: "compact" as const,
   },
 ];
+
+type Card = (typeof primaryCards)[number] | (typeof secondaryCards)[number];
+
+function CardLink({ card }: { card: Card }) {
+  const isCompact = card.variant === "compact";
+
+  const baseClasses =
+    "group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400";
+  const padding = isCompact ? "p-4" : "p-6";
+  const titleClasses = `mt-4 font-semibold text-neutral-900 ${isCompact ? "text-lg" : "text-xl"}`;
+  const descriptionClasses = `mt-2 text-neutral-600 ${isCompact ? "text-xs" : "text-sm"}`;
+  const ctaClasses = `mt-auto inline-flex items-center gap-1 pt-6 font-medium text-neutral-900 ${
+    isCompact ? "text-xs" : "text-sm"
+  }`;
+
+  return (
+    <Link
+      key={`${card.title}-${card.href}`}
+      href={card.href}
+      target="_blank"
+      rel="noreferrer"
+      className={`${baseClasses} ${padding}`}
+    >
+      <div className={isCompact ? "text-3xl" : "text-4xl"} aria-hidden>
+        {card.emoji}
+      </div>
+      <h2 className={titleClasses}>{card.title}</h2>
+      <p className={descriptionClasses}>{card.description}</p>
+      <span className={ctaClasses}>
+        Öppna
+        <span className="transition-transform group-hover:translate-x-0.5">→</span>
+      </span>
+    </Link>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -44,36 +82,18 @@ export default function HomePage() {
             Välj vilket intranätsverktyg du vill öppna.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => {
-            const isCompact = card.variant === "compact";
-
-            return (
-              <Link
-                key={`${card.title}-${card.href}`}
-                href={card.href}
-                target="_blank"
-                rel="noreferrer"
-                className={`group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 ${isCompact ? "p-4" : "p-6"}`}
-              >
-                <div className={isCompact ? "text-3xl" : "text-4xl"} aria-hidden>
-                  {card.emoji}
-                </div>
-                <h2 className={`mt-4 font-semibold text-neutral-900 ${isCompact ? "text-lg" : "text-xl"}`}>
-                  {card.title}
-                </h2>
-                <p className={`mt-2 text-neutral-600 ${isCompact ? "text-xs" : "text-sm"}`}>
-                  {card.description}
-                </p>
-                <span
-                  className={`mt-auto inline-flex items-center gap-1 pt-6 font-medium text-neutral-900 ${isCompact ? "text-xs" : "text-sm"}`}
-                >
-                  Öppna
-                  <span className="transition-transform group-hover:translate-x-0.5">→</span>
-                </span>
-              </Link>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {primaryCards.map((card) => (
+            <CardLink key={`${card.title}-${card.href}`} card={card} />
+          ))}
+        </div>
+        <div className="pt-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Övriga verktyg</h3>
+          <div className="mt-3 max-w-xs">
+            {secondaryCards.map((card) => (
+              <CardLink key={`${card.title}-${card.href}`} card={card} />
+            ))}
+          </div>
         </div>
       </section>
     </main>
