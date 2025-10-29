@@ -265,7 +265,7 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
                       {report.title}
                     </Link>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                      <Badge variant="outline">{report.status}</Badge>
+                      <Badge variant="neutral">{report.status}</Badge>
                       {report.next_step_due ? <span>Nästa steg: {report.next_step_due}</span> : null}
                       <span>Besök: {formatDate(report.visit_date)}</span>
                       <span>Senast uppdaterad: {formatDate(report.updated_at)}</span>
