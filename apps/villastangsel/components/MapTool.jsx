@@ -22,7 +22,7 @@ const CORNER_THRESHOLD = 45;
 const ROLL_LENGTH_M = 25;
 const STAY_WIRE_RATIO = 2;
 const STAY_WIRE_ROLL_M = 50;
-const BUNDLED_PRODUCTS_URL = "/data/products.xlsx";
+const BUNDLED_PRODUCTS_PATH = "/data/products.xlsx";
 const CONCRETE_PER_POST = 2; // 2 st plintbetong per stolpe
 const GATE_CONCRETE_PER_GATE = 6; // 3 säck per grindstolpe, 2 stolpar per grind
 
@@ -68,6 +68,16 @@ function turningAngleDeg(prev, curr, next) {
   return diff;
 }
 const toPoint = (v) => turf.point([v.lng, v.lat]);
+
+function getAssetPrefix() {
+  if (typeof window === "undefined") return "";
+  const pathname = window.location?.pathname || "";
+  if (pathname.startsWith("/villastangsel")) return "/villastangsel";
+  if (pathname.startsWith("/industristangsel")) return "/industristangsel";
+  return "";
+}
+
+const resolveAssetPath = (path = "") => `${getAssetPrefix()}${path}`;
 
 // --- Google Static Maps helpers (TOP-LEVEL) ---
 // Lägg detta block strax efter geo-helpersna och före computeAll()
@@ -735,22 +745,24 @@ const addGate = useCallback(() => {
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
   async function getLogoDataUrl(path = "/logos/logo.png") {
-  const res = await fetch(path, { cache: "no-cache" });
-  if (!res.ok) throw new Error("Logo not found at " + path);
-  const blob = await res.blob();
-  return await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result); // data:image/png;base64,....
-    reader.readAsDataURL(blob);
-  });
-}
+    const res = await fetch(resolveAssetPath(path), { cache: "no-cache" });
+    if (!res.ok) throw new Error("Logo not found at " + path);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result); // data:image/png;base64,....
+      reader.readAsDataURL(blob);
+    });
+  }
 
   
   // Ladda inbäddad Excel
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(BUNDLED_PRODUCTS_URL, { cache: "no-store" });
+                const res = await fetch(resolveAssetPath(BUNDLED_PRODUCTS_PATH), {
+          cache: "no-store",
+        });
         if (!res.ok) return;
         const buf = await res.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
@@ -2963,11 +2975,11 @@ const path = [
   <span className="btn-inline-logo__label">
     {creatingCart ? "Skapar varukorg…" : "Skapa varukorg"}
   </span>
-  <img
-    src="/logos/klarna.png"
-    alt="Klarna"
-    className="btn-inline-logo__img"
-  />
+          <img
+            src={resolveAssetPath("/logos/klarna.png")}
+            alt="Klarna"
+            className="btn-inline-logo__img"
+          />
 </button>
 </div>
 

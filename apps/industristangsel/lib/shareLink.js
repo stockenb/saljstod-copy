@@ -9,8 +9,19 @@ export function buildShareUrl(state) {
     typeof window !== "undefined" && window.location
       ? window.location.origin
       : ""; // fallback
+
+        const pathname =
+    typeof window !== "undefined" && window.location
+      ? window.location.pathname || "/"
+      : "/";
+  const basePath = pathname.startsWith("/industristangsel")
+    ? "/industristangsel"
+    : pathname.startsWith("/villastangsel")
+    ? "/villastangsel"
+    : "/";
+
   // query ?view=1 triggar readOnly-vy, hash bär datan
-  return `${origin}/?view=1#s=${enc}`;
+  return `${origin}${basePath === "/" ? "" : basePath}?view=1#s=${enc}`;
 }
 
 export function readStateFromHash() {

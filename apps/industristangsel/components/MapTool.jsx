@@ -24,7 +24,7 @@ const STAY_WIRE_RATIO = 2;
 const STAY_WIRE_ROLL_M = 50;
 const BARBWIRE_LINES = 3;
 const BARBWIRE_ROLL_M = 250;
-const BUNDLED_PRODUCTS_URL = "/data/products.xlsx";
+const BUNDLED_PRODUCTS_PATH = "/data/products.xlsx";
 const CONCRETE_PER_POST = 3; // 3 st plintbetong per stolpe
 const GATE_CONCRETE_PER_GATE = 6; // 3 säck per grindstolpe, 2 stolpar per grind
 
@@ -70,6 +70,16 @@ function turningAngleDeg(prev, curr, next) {
   return diff;
 }
 const toPoint = (v) => turf.point([v.lng, v.lat]);
+
+function getAssetPrefix() {
+  if (typeof window === "undefined") return "";
+  const pathname = window.location?.pathname || "";
+  if (pathname.startsWith("/industristangsel")) return "/industristangsel";
+  if (pathname.startsWith("/villastangsel")) return "/villastangsel";
+  return "";
+}
+
+const resolveAssetPath = (path = "") => `${getAssetPrefix()}${path}`;
 
 // --- Google Static Maps helpers (TOP-LEVEL) ---
 // Lägg detta block strax efter geo-helpersna och före computeAll()
@@ -744,15 +754,15 @@ const addGate = useCallback(() => {
   const [pricesLoaded, setPricesLoaded] = useState(false);
 
   async function getLogoDataUrl(path = "/logos/logo.png") {
-  const res = await fetch(path, { cache: "no-cache" });
-  if (!res.ok) throw new Error("Logo not found at " + path);
-  const blob = await res.blob();
-  return await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result); // data:image/png;base64,....
-    reader.readAsDataURL(blob);
-  });
-}
+    const res = await fetch(resolveAssetPath(path), { cache: "no-cache" });
+    if (!res.ok) throw new Error("Logo not found at " + path);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result); // data:image/png;base64,....
+      reader.readAsDataURL(blob);
+    });
+  }
 
   
   // Ladda inbäddad Excel
@@ -3185,11 +3195,11 @@ const path = [
   <span className="btn-inline-logo__label">
     {creatingCart ? "Skapar varukorg…" : "Skapa varukorg"}
   </span>
-  <img
-    src="/logos/klarna.png"
-    alt="Klarna"
-    className="btn-inline-logo__img"
-  />
+          <img
+            src={resolveAssetPath("/logos/klarna.png")}
+            alt="Klarna"
+            className="btn-inline-logo__img"
+          />
 </button>
 </div>
 

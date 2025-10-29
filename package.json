@@ -14,17 +14,27 @@
     "invite:users": "node ./scripts/invite-users.mjs"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.7",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.58.0",
+    "@turf/turf": "^6.5.0",
+    "@vercel/analytics": "^1.5.0",
     "clsx": "2.1.1",
     "framer-motion": "11.2.10",
+    "fast-xml-parser": "^5.2.5",
+    "jspdf": "^3.0.2",
+    "jspdf-autotable": "^5.0.2",
+    "leaflet": "^1.9.4",
     "lucide-react": "0.441.0",
     "next": "^14.2.33",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-leaflet": "^4.2.1",
     "react-markdown": "9.0.1",
     "tailwind-merge": "2.5.2",
     "typescript": "5.5.4",
+    "lz-string": "^1.5.0",
+    "xlsx": "^0.18.5",
     "zod": "3.23.8"
   },
   "devDependencies": {
