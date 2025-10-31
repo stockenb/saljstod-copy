@@ -31,60 +31,78 @@ function normalizeArray<T>(value: T | T[] | undefined): T[] {
 }
 
 function normalizeSpecs(node: RawSpecNode): { key: string; value: string }[] {
-  const collectValues = (value: RawSpecNode): string[] => {
-    if (value === null || value === undefined) {
-      return [];
-    }
+  const specs: { key: string; value: string }[] = [];
 
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
-      const normalized = String(value).trim();
-      return normalized ? [normalized] : [];
-    }
-
-    if (Array.isArray(value)) {
-      return value.flatMap((entry) => collectValues(entry));
-    }
-
-    if (typeof value === "object") {
-      const record = value as Record<string, RawSpecNode>;
-
-      if ("specification" in record) {
-        return collectValues(record.specification);
+  const appendFromObject = (obj: Record<string, unknown>) => {
+    Object.entries(obj).forEach(([key, value]) => {
+      if (value === null || value === undefined) {
+        return;
       }
 
-      return Object.values(record).flatMap((entry) => collectValues(entry));
-    }
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        specs.push({ key, value: String(value) });
+        return;
+      }
 
-    return [];
+      if (Array.isArray(value)) {
+        value.forEach((entry) => {
+          if (entry === null || entry === undefined) {
+            return;
+          }
+
+          if (
+            typeof entry === "string" ||
+            typeof entry === "number" ||
+            typeof entry === "boolean"
+          ) {
+            specs.push({ key, value: String(entry) });
+          } else if (typeof entry === "object") {
+            appendFromObject(entry as Record<string, unknown>);
+          }
+        });
+        return;
+      }
+
+      if (typeof value === "object") {
+        appendFromObject(value as Record<string, unknown>);
+      }
+    });
   };
 
-  const toKeyValue = (raw: string): { key: string; value: string } => {
-    const [maybeKey, ...rest] = raw.split(":");
-    if (rest.length > 0) {
-      return {
-        key: maybeKey.trim() || "Specifikation",
-        value: rest.join(":").trim(),
-      };
-    }
+  if (node === null || node === undefined) {
+    return specs;
+  }
 
-    return { key: "Specifikation", value: raw.trim() };
-  };
+  if (typeof node === "string" || typeof node === "number" || typeof node === "boolean") {
+    specs.push({ key: "Specifikation", value: String(node) });
+    return specs;
+  }
 
-  return collectValues(node)
-    .map((entry) => entry.replace(/\s+/g, " ").trim())
-    .filter((entry) => entry.length > 0)
-    .map(toKeyValue);
+  if (Array.isArray(node)) {
+    node.forEach((entry) => {
+      if (entry === null || entry === undefined) {
+        return;
+      }
+
+      if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") {
+        specs.push({ key: "Specifikation", value: String(entry) });
+      } else if (typeof entry === "object") {
+        appendFromObject(entry as Record<string, unknown>);
+      }
+    });
+    return specs;
+  }
+
+  appendFromObject(node as Record<string, unknown>);
+  return specs;
 }
 
 function toProduct(item: Record<string, unknown>): NormalizedProduct {
-  const specsNode =
-    (item.specifications as RawSpecNode | undefined) ??
-    (item.specifikation as RawSpecNode | undefined);
-  const specs = normalizeSpecs(specsNode);
+  const specs = normalizeSpecs(item.specifikation as RawSpecNode);
 
   return {
     articleNumber: String(item.id ?? ""),

@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, useMemo, useState } from "react";
-import type { jsPDF as JsPDFType } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,93 +49,6 @@ const contactDetails = [
   "Nils Ahlgren AB • Västberga Allé 61, 126 30 Hägersten",
   "info@nilsahlgren.se • +46 8 19 25 00 • www.nilsahlgren.se",
 ];
-
-const POPPINS_REGULAR_URL =
-  "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf";
-const POPPINS_SEMIBOLD_URL =
-  "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-SemiBold.ttf";
-
-type PoppinsFonts = { regular: string; semiBold: string };
-
-let poppinsFontData: PoppinsFonts | null = null;
-let poppinsFontPromise: Promise<PoppinsFonts | null> | null = null;
-
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = "";
-
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    const chunk = bytes.subarray(offset, offset + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-}
-
-async function loadPoppinsFontData(): Promise<PoppinsFonts | null> {
-  if (poppinsFontData) {
-    return poppinsFontData;
-  }
-
-  if (!poppinsFontPromise) {
-    poppinsFontPromise = (async () => {
-      try {
-        const [regularResponse, semiBoldResponse] = await Promise.all([
-          fetch(POPPINS_REGULAR_URL),
-          fetch(POPPINS_SEMIBOLD_URL),
-        ]);
-
-        if (!regularResponse.ok || !semiBoldResponse.ok) {
-          throw new Error("Kunde inte ladda font-resurser");
-        }
-
-        const [regularBuffer, semiBoldBuffer] = await Promise.all([
-          regularResponse.arrayBuffer(),
-          semiBoldResponse.arrayBuffer(),
-        ]);
-
-        const fonts: PoppinsFonts = {
-          regular: arrayBufferToBase64(regularBuffer),
-          semiBold: arrayBufferToBase64(semiBoldBuffer),
-        };
-
-        poppinsFontData = fonts;
-        return fonts;
-      } catch (error) {
-        console.warn("Kunde inte hämta Poppins-typsnitt", error);
-        return null;
-      }
-    })();
-  }
-
-  const result = await poppinsFontPromise;
-
-  if (!result) {
-    poppinsFontPromise = null;
-  }
-
-  return result;
-}
-
-async function ensurePoppinsFont(doc: JsPDFType): Promise<boolean> {
-  const fonts = await loadPoppinsFontData();
-
-  if (!fonts) {
-    return false;
-  }
-
-  try {
-    doc.addFileToVFS("Poppins-Regular.ttf", fonts.regular);
-    doc.addFont("Poppins-Regular.ttf", "Poppins", "normal");
-    doc.addFileToVFS("Poppins-SemiBold.ttf", fonts.semiBold);
-    doc.addFont("Poppins-SemiBold.ttf", "Poppins", "bold");
-    return true;
-  } catch (error) {
-    console.warn("Kunde inte bädda in Poppins i PDF", error);
-    return false;
-  }
-}
 
 async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
   if (!source) {
@@ -321,182 +233,95 @@ export default function ProduktbladPage() {
 
   const handleGeneratePdf = async () => {
     setPdfState({ status: "loading", message: "Genererar PDF..." });
-
     try {
       const [{ jsPDF }, autoTableModule] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
       ]);
-      const autoTable = (autoTableModule.default ?? autoTableModule) as typeof autoTableModule.default;
+      const autoTable = autoTableModule.default;
 
-      const doc = new jsPDF({ unit: "mm" });
-      const hasPoppins = await ensurePoppinsFont(doc as unknown as JsPDFType);
-      const baseFont = hasPoppins ? "Poppins" : "helvetica";
-      const headingStyle = hasPoppins ? "bold" : "bold";
-      const bodyStyle = "normal";
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 16;
-      const contentWidth = pageWidth - margin * 2;
-
-      doc.setFillColor(17, 24, 39);
-      const headerHeight = 46;
-      doc.roundedRect(margin, margin, contentWidth, headerHeight, 6, 6, "F");
-
-      doc.setFont(baseFont, headingStyle);
-      doc.setFontSize(20);
-      doc.setTextColor(255, 255, 255);
-      doc.text(form.title || "Produktblad", margin + 12, margin + 22, {
-        maxWidth: contentWidth - 24,
-      });
-
-      doc.setFontSize(11);
-      doc.setFont(baseFont, bodyStyle);
-      doc.setTextColor(226, 232, 240);
-
-      const headerInfoX = margin + 12;
-      let headerInfoY = margin + 32;
-
-      if (form.articleNumber) {
-        doc.text(`Artikelnummer: ${form.articleNumber}`, headerInfoX, headerInfoY, {
-          maxWidth: contentWidth - 24,
-        });
-        headerInfoY += 5.5;
-      }
-
-      if (form.weight) {
-        doc.text(`Vikt: ${form.weight}`, headerInfoX, headerInfoY, {
-          maxWidth: contentWidth - 24,
-        });
-        headerInfoY += 5.5;
-      }
-
-      if (form.link) {
-        doc.setTextColor(165, 243, 252);
-        doc.textWithLink("Produktlänk", headerInfoX, headerInfoY, { url: form.link });
-        doc.setTextColor(226, 232, 240);
-      }
-
-      let currentY = margin + headerHeight + 14;
+      const doc = new jsPDF();
 
       const image = await convertImageToDataUrl(form.image);
-      const columnGap = 12;
-      const imageBoxWidth = 68;
-      const imageBoxHeight = 68;
-      const textWidth = image ? contentWidth - imageBoxWidth - columnGap : contentWidth;
-      const textStartX = margin;
-
-      if (image && textWidth > 40) {
-        const imageX = margin + textWidth + columnGap;
-        const imageY = currentY - 4;
-
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(imageX - 2, imageY - 2, imageBoxWidth + 4, imageBoxHeight + 8, 6, 6, "F");
-
+      if (image) {
         try {
-          doc.addImage(image.dataUrl, image.format, imageX, imageY, imageBoxWidth, imageBoxHeight, "", "FAST");
+          doc.addImage(image.dataUrl, image.format, 140, 20, 50, 50);
         } catch (imageError) {
           console.warn("Kunde inte lägga till bild i PDF", imageError);
         }
-
-        doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(imageX - 2, imageY - 2, imageBoxWidth + 4, imageBoxHeight + 8, 6, 6, "S");
       }
 
-      doc.setFont(baseFont, headingStyle);
-      doc.setFontSize(13);
-      doc.setTextColor(30, 41, 59);
-      doc.text("Produktinformation", textStartX, currentY);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text(form.title || "Produktblad", 14, 24);
 
-      doc.setFont(baseFont, bodyStyle);
-      doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      let currentY = 34;
 
-      let textCursorY = currentY + 6;
+      if (form.articleNumber) {
+        doc.text(`Artikelnummer: ${form.articleNumber}`, 14, currentY);
+        currentY += 6;
+      }
+
+      if (form.weight) {
+        doc.text(`Vikt: ${form.weight}`, 14, currentY);
+        currentY += 6;
+      }
 
       if (form.link) {
         doc.setTextColor(37, 99, 235);
-        doc.textWithLink("Öppna i webbshop", textStartX, textCursorY, { url: form.link });
-        doc.setTextColor(71, 85, 105);
-        textCursorY += 6;
+        doc.textWithLink(form.link, 14, currentY, { url: form.link });
+        doc.setTextColor(0, 0, 0);
+        currentY += 8;
       }
 
       if (form.description) {
-        doc.setFont(baseFont, headingStyle);
         doc.setFontSize(12);
-        doc.setTextColor(30, 41, 59);
-        doc.text("Beskrivning", textStartX, textCursorY + 2);
-
-        doc.setFont(baseFont, bodyStyle);
+        doc.text("Beskrivning:", 14, currentY);
+        currentY += 6;
         doc.setFontSize(11);
-        doc.setTextColor(71, 85, 105);
-        textCursorY += 8;
-
-        const descriptionLines = doc.splitTextToSize(form.description, textWidth);
-        doc.text(descriptionLines, textStartX, textCursorY);
-        textCursorY += descriptionLines.length * 5 + 4;
+        const descriptionLines = doc.splitTextToSize(form.description, 180);
+        doc.text(descriptionLines, 14, currentY);
+        currentY += descriptionLines.length * 5 + 4;
       }
 
-      const imageBottom = image ? currentY - 4 + imageBoxHeight + 8 : 0;
-      currentY = Math.max(textCursorY, image ? imageBottom + 6 : textCursorY) + 6;
+      if (form.specs.length > 0) {
+        const body = form.specs
+          .filter((spec) => spec.key.trim() || spec.value.trim())
+          .map((spec) => [spec.key.trim(), spec.value.trim()]);
 
-      const specificationRows = form.specs
-        .filter((spec) => spec.key.trim() || spec.value.trim())
-        .map((spec) => [spec.key.trim(), spec.value.trim()]);
+        if (body.length > 0) {
+          autoTable(doc, {
+            startY: currentY,
+            head: [["Specifikation", "Värde"]],
+            body,
+            styles: {
+              font: "helvetica",
+              fontSize: 10,
+              cellPadding: 3,
+            },
+            headStyles: {
+              fillColor: [17, 24, 39],
+              textColor: [255, 255, 255],
+            },
+            alternateRowStyles: {
+              fillColor: [243, 244, 246],
+            },
+          });
 
-      if (specificationRows.length > 0) {
-        doc.setFont(baseFont, headingStyle);
-        doc.setFontSize(12);
-        doc.setTextColor(30, 41, 59);
-        doc.text("Specifikationer", margin, currentY);
-        currentY += 6;
-
-        autoTable(doc, {
-          startY: currentY,
-          margin: { left: margin, right: margin },
-          head: [["Specifikation", "Värde"]],
-          body: specificationRows,
-          tableWidth: contentWidth,
-          styles: {
-            font: baseFont,
-            fontStyle: bodyStyle,
-            fontSize: 10,
-            cellPadding: 3,
-            textColor: [55, 65, 81],
-          },
-          headStyles: {
-            font: baseFont,
-            fontStyle: headingStyle,
-            fontSize: 10,
-            fillColor: [17, 24, 39],
-            textColor: [255, 255, 255],
-          },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252],
-          },
-          columnStyles: {
-            0: { cellWidth: contentWidth * 0.35 },
-            1: { cellWidth: contentWidth * 0.65 },
-          },
-        });
-
-        const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
-        if (finalY) {
-          currentY = finalY + 12;
+          const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+          if (finalY) {
+            currentY = finalY + 8;
+          }
         }
       }
 
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin, pageHeight - 26, pageWidth - margin, pageHeight - 26);
-
-      doc.setFont(baseFont, bodyStyle);
+      const pageHeight = doc.internal.pageSize.getHeight();
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
       contactDetails.forEach((line, index) => {
-        doc.text(line, pageWidth / 2, pageHeight - 18 + index * 5.5, {
-          align: "center",
-        });
+        doc.text(line, 14, pageHeight - 16 + index * 6);
       });
 
       doc.save(createFilename(form));
