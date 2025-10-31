@@ -2,24 +2,24 @@
 
 import { useEffect, useState } from "react";
 
-import { createClient } from "@/lib/supabase/client";
+import { supabaseBrowser } from "@/lib/supabase/browserClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ProfilePage() {
-  const supabase = createClient();
   const [email, setEmail] = useState<string>("");
   const [role, setRole] = useState<string>("");
 
   useEffect(() => {
+    const client = supabaseBrowser;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await client.auth.getUser();
       setEmail(user?.email || "");
-      const { data } = await supabase.from("profiles").select("role").eq("id", user?.id).maybeSingle();
+      const { data } = await client.from("profiles").select("role").eq("id", user?.id).maybeSingle();
       setRole(data?.role || "");
     })();
-  }, [supabase]);
+  }, []);
 
   function toggleTheme() {
     const html = document.documentElement;

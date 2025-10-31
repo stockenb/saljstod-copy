@@ -2,13 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { markRead } from "@/app/nyheter/actions";
 
 export default async function NewsDetail({ params }: { params: { slug: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: news } = await supabase.from("news_items").select("*").eq("slug", params.slug).maybeSingle();
   if (!news) return notFound();
 

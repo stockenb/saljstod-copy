@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { completeFollowUp, deleteReport, updateReport } from "@/app/rapporter/ac
 import { formatDate } from "@/lib/utils";
 
 export default async function ReportDetail({ params }: { params: { id: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: report } = await supabase.from("visit_reports").select("*").eq("id", params.id).maybeSingle();
   if (!report) return notFound();
 

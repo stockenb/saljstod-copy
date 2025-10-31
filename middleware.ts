@@ -5,33 +5,38 @@ import { createServerClient } from "@supabase/ssr";
 const PROTECTED = ["/", "/rapporter", "/nyheter", "/profil", "/admin"];
 
 export async function middleware(req: NextRequest) {
-  const { nextUrl, cookies } = req;
+  const { nextUrl } = req;
   const res = NextResponse.next();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookies.get(name)?.value;
+  let supabase: ReturnType<typeof createServerClient> | null = null;
+  try {
+    supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get: (name) => req.cookies.get(name)?.value,
+          set: (name, value, options) => res.cookies.set(name, value, options),
+          remove: (name, options) => res.cookies.set(name, "", { ...options, expires: new Date(0) }),
         },
-        set(name: string, value: string, options: any) {
-          res.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: any) {
-          res.cookies.set({ name, value: "", ...options });
-        },
-      },
-    }
-  );
+      }
+    );
+    await supabase.auth.getUser().catch(() => undefined);
+  } catch (error) {
+    return res;
+  }
+
+  if (!supabase) {
+    return res;
+  }
 
   const path = nextUrl.pathname;
 
   const isProtected = PROTECTED.some((p) => path === p || path.startsWith(p + "/"));
   if (!isProtected) return res;
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const userResponse = await supabase.auth.getUser().catch(() => null);
+  const user = userResponse?.data.user ?? null;
   if (!user) {
     const url = new URL("/login", nextUrl.origin);
     return NextResponse.redirect(url);

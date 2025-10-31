@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 
 export default async function NewsListPage() {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: news } = await supabase
     .from("news_items")
     .select("id,slug,title,categories,pinned,published_at")

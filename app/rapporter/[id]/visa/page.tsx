@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function ReportViewPage({ params }: { params: { id: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: report } = await supabase
     .from("visit_reports")
     .select(

@@ -1,4 +1,4 @@
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { deleteNews, upsertNews } from "@/app/nyheter/actions";
 
 export default async function AdminNewsPage() {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = user ? await supabase.from("profiles").select("*").eq("id", user.id).single() : { data: null };
   if (profile?.role !== "ADMIN") return notFound();
