@@ -356,6 +356,9 @@ export default function ProduktbladPage() {
       const marginX = 20;
       const contentWidth = pageWidth - marginX * 2;
 
+      const logoTop = 6;
+      let headerTop = 18;
+
       if (logoImage) {
         try {
           const logoProps = doc.getImageProperties(logoImage.dataUrl);
@@ -369,28 +372,30 @@ export default function ProduktbladPage() {
           }
 
           const logoX = marginX;
-          const logoY = 6;
+          const logoY = logoTop;
           doc.addImage(logoImage.dataUrl, logoImage.format, logoX, logoY, logoWidth, logoHeight);
+
+          headerTop = Math.max(headerTop, logoY + logoHeight + 6);
         } catch (logoError) {
           console.warn("Kunde inte lägga till logotyp i PDF", logoError);
         }
       }
-
+      
       doc.setFillColor(15, 23, 42);
-      doc.roundedRect(marginX, 18, contentWidth, 26, 4, 4, "F");
+      doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
-      doc.text(form.title || "Produktblad", marginX + 8, 30);
+      doc.text(form.title || "Produktblad", marginX + 8, headerTop + 12);
 
       if (form.articleNumber) {
         doc.setFont(baseFont, normalStyle);
         doc.setFontSize(11);
         doc.setTextColor(226, 232, 240);
-        doc.text(`Artikelnummer: ${form.articleNumber}`, marginX + 8, 38);
+        doc.text(`Artikelnummer: ${form.articleNumber}`, marginX + 8, headerTop + 20);
       }
 
-      let currentY = 52;
+      let currentY = headerTop + 34;
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
 
       const image = await convertImageToDataUrl(form.image);
