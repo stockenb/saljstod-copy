@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { createReport } from "@/app/rapporter/actions";
 
 import { NewReportForm } from "./report-form";
 
 export default async function NewReportPage({ searchParams }: { searchParams: { customer_id?: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: customers } = await supabase
     .from("customers")
     .select("id,name,address_line,postal_code,city,email,phone")

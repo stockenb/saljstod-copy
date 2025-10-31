@@ -15,7 +15,7 @@ Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Rou
 1) Skapa ett Supabase-projekt. Hämta:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (behövs för scriptet nedan)
+   - `SUPABASE_SERVICE_ROLE` (behövs för scriptet nedan)
 2) Konfigurera miljövariabler:
    ```bash
    cp .env.example .env.local

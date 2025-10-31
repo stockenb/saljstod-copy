@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { formatDate } from "@/lib/utils";
 
 function escapePdf(text: string) {
@@ -51,7 +51,7 @@ function buildPdf(lines: string[]) {
 }
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();

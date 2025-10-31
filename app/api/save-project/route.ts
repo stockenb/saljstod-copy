@@ -1,29 +1,25 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+
+import { supabaseService } from "@/lib/supabase/serviceClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     const missing: string[] = [];
     if (!SUPABASE_URL) missing.push("SUPABASE_URL");
-    if (!SUPABASE_SERVICE_KEY)
-      missing.push("SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SERVICE_ROLE");
+    if (!SUPABASE_SERVICE_KEY) missing.push("SUPABASE_SERVICE_ROLE");
 
     return NextResponse.json(
       { ok: false, error: `Supabase env not configured: ${missing.join(", ")}` },
       { status: 500 }
     );
   }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-    auth: { persistSession: false },
-  });
+  const supabase = supabaseService;
 
   try {
     const body = await req.json();

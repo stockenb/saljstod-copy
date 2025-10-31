@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createCustomer } from "./actions";
 
 export default async function CustomersPage() {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();

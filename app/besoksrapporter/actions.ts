@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { logAudit } from "@/lib/audit";
 
 function payloadFromForm(formData: FormData) {
@@ -30,7 +30,7 @@ function contactPayloadFromForm(formData: FormData) {
 }
 
 export async function createCustomer(formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -49,7 +49,7 @@ export async function createCustomer(formData: FormData) {
 }
 
 export async function updateCustomer(id: string, formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const payload = payloadFromForm(formData);
   const { error } = await supabase.from("customers").update(payload).eq("id", id);
   if (error) throw error;
@@ -59,7 +59,7 @@ export async function updateCustomer(id: string, formData: FormData) {
 }
 
 export async function deleteCustomer(id: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { error } = await supabase.from("customers").delete().eq("id", id);
   if (error) throw error;
   await logAudit("DELETE", "customers", id);
@@ -67,7 +67,7 @@ export async function deleteCustomer(id: string) {
 }
 
 export async function createCustomerContact(customerId: string, formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const payload = {
     customer_id: customerId,
     ...contactPayloadFromForm(formData),
@@ -79,7 +79,7 @@ export async function createCustomerContact(customerId: string, formData: FormDa
 }
 
 export async function updateCustomerContact(customerId: string, contactId: string, formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const payload = contactPayloadFromForm(formData);
   const { error } = await supabase.from("customer_contacts").update(payload).eq("id", contactId);
   if (error) throw error;
@@ -88,7 +88,7 @@ export async function updateCustomerContact(customerId: string, contactId: strin
 }
 
 export async function deleteCustomerContact(customerId: string, contactId: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { error } = await supabase.from("customer_contacts").delete().eq("id", contactId);
   if (error) throw error;
   await logAudit("DELETE", "customer_contacts", contactId);

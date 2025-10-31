@@ -62,7 +62,7 @@ function loadEnv() {
 loadEnv();
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE;
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 async function upsertProfile(supabase, id, email, role) {
@@ -114,7 +114,7 @@ async function inviteOne(supabase, email, role) {
 
 async function main() {
   if (!url || !serviceKey) {
-    throw new Error("Saknar NEXT_PUBLIC_SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY");
+    throw new Error("Saknar NEXT_PUBLIC_SUPABASE_URL eller SUPABASE_SERVICE_ROLE");
   }
 
   const supabase = createClient(url, serviceKey);

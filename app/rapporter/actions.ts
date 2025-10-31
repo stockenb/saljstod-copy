@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { logAudit } from "@/lib/audit";
 
 export async function createReport(formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Inte inloggad");
 
@@ -38,7 +38,7 @@ export async function createReport(formData: FormData) {
 }
 
 export async function updateReport(id: string, formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const statusValue = String(formData.get("status") || "").trim();
   const payload: any = {
     title: String(formData.get("title") || ""),
@@ -67,7 +67,7 @@ export async function updateReport(id: string, formData: FormData) {
 }
 
 export async function deleteReport(id: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { error } = await supabase.from("visit_reports").delete().eq("id", id);
   if (error) throw error;
   await logAudit("DELETE", "visit_reports", id);
@@ -75,7 +75,7 @@ export async function deleteReport(id: string) {
 }
 
 export async function completeFollowUp(id: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { error } = await supabase.from("visit_reports").update({ next_step_due: null }).eq("id", id);
   if (error) throw error;
   await logAudit("FOLLOWUP_COMPLETED", "visit_reports", id);

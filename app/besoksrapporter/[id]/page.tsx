@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 } from "../actions";
 
 export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: customer } = await supabase
     .from("customers")
     .select("id,name,org_number,address_line,postal_code,city,email,phone,notes,created_at")

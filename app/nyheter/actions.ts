@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { logAudit } from "@/lib/audit";
 
 function slugify(value: string) {
@@ -15,7 +15,7 @@ function slugify(value: string) {
 }
 
 export async function markRead(news_id: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from("news_reads").upsert({ user_id: user.id, news_id });
@@ -23,7 +23,7 @@ export async function markRead(news_id: string) {
 }
 
 export async function upsertNews(formData: FormData) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const id = String(formData.get("id") || "");
   const title = String(formData.get("title") || "").trim();
   let slug = String(formData.get("slug") || "").trim();
@@ -59,7 +59,7 @@ export async function upsertNews(formData: FormData) {
 }
 
 export async function deleteNews(id: string) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   await supabase.from("news_items").delete().eq("id", id);
   await logAudit("DELETE", "news_items", id);
   revalidatePath("/nyheter");

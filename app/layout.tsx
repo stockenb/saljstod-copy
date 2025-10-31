@@ -1,7 +1,7 @@
 import "../styles/globals.css";
 import { Work_Sans } from "next/font/google";
 import { ReactNode } from "react";
-import { createServerClientSupabase } from "@/lib/supabase/server";
+import { getSupabaseServer } from "@/lib/supabase/serverClient";
 import { Navbar } from "@/components/navbar";
 import { site } from "@/config/site";
 
@@ -17,7 +17,7 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const supabase = createServerClientSupabase();
+  const supabase = getSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
