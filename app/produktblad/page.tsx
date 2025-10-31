@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, KeyboardEvent, useMemo, useState } from "react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,8 @@ type PdfImage = {
   dataUrl: string;
   format: "PNG" | "JPEG" | "WEBP";
 };
+
+const LOGO_IMAGE_PATH = "/na_foretag.png";
 
 const POPPINS_FONT_URLS = {
   regular: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.ttf",
@@ -118,6 +120,17 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
     console.error("Kunde inte läsa in bilden", error);
     return null;
   }
+}
+
+let logoCache: PdfImage | null | undefined;
+
+async function loadLogoImage() {
+  if (typeof logoCache !== "undefined") {
+    return logoCache;
+  }
+
+  logoCache = await convertImageToDataUrl(LOGO_IMAGE_PATH);
+  return logoCache;
 }
 
 function createFilename(form: ProductFormData) {
@@ -275,6 +288,28 @@ export default function ProduktbladPage() {
     setForm((prev) => ({ ...prev, specs: [...prev.specs, { key: "", value: "" }] }));
   };
 
+  const handleSpecKeyDown = (event: KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (index !== form.specs.length - 1) {
+      return;
+    }
+
+    const currentSpec = form.specs[index];
+    if (!currentSpec) {
+      handleAddSpec();
+      return;
+    }
+
+    if (currentSpec.key.trim() || currentSpec.value.trim()) {
+      handleAddSpec();
+    }
+  };
+
   const handleRemoveSpec = (index: number) => {
     setForm((prev) => ({
       ...prev,
@@ -300,9 +335,10 @@ export default function ProduktbladPage() {
   const handleGeneratePdf = async () => {
     setPdfState({ status: "loading", message: "Genererar PDF..." });
     try {
-      const [{ jsPDF }, autoTableModule] = await Promise.all([
+      const [{ jsPDF }, autoTableModule, logoImage] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
+        loadLogoImage(),
       ]);
       const autoTable = autoTableModule.default;
 
@@ -319,6 +355,26 @@ export default function ProduktbladPage() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const marginX = 20;
       const contentWidth = pageWidth - marginX * 2;
+
+      if (logoImage) {
+        try {
+          const logoProps = doc.getImageProperties(logoImage.dataUrl);
+          const maxLogoWidth = 60;
+          let logoWidth = maxLogoWidth;
+          let logoHeight = (logoProps.height / logoProps.width) * logoWidth;
+
+          if (logoHeight > 12) {
+            logoHeight = 12;
+            logoWidth = (logoProps.width / logoProps.height) * logoHeight;
+          }
+
+          const logoX = marginX;
+          const logoY = 6;
+          doc.addImage(logoImage.dataUrl, logoImage.format, logoX, logoY, logoWidth, logoHeight);
+        } catch (logoError) {
+          console.warn("Kunde inte lägga till logotyp i PDF", logoError);
+        }
+      }
 
       doc.setFillColor(15, 23, 42);
       doc.roundedRect(marginX, 18, contentWidth, 26, 4, 4, "F");
@@ -643,12 +699,14 @@ export default function ProduktbladPage() {
                   <Input
                     value={spec.key}
                     onChange={(event) => handleSpecChange(index, "key", event.target.value)}
+                    onKeyDown={(event) => handleSpecKeyDown(event, index)}
                     placeholder="Specifikation"
                     aria-label={`Specifikation ${index + 1}`}
                   />
                   <Input
                     value={spec.value}
                     onChange={(event) => handleSpecChange(index, "value", event.target.value)}
+                    onKeyDown={(event) => handleSpecKeyDown(event, index)}
                     placeholder="Värde"
                     aria-label={`Värde för specifikation ${index + 1}`}
                   />

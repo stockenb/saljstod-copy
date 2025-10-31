@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -36,8 +37,16 @@ export function Navbar({ role }: { role?: string | null }) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/60 bg-white/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-4 text-sm text-neutral-600 sm:px-8 lg:flex-nowrap lg:px-10">
-        <Link href="/" className="shrink-0 text-base font-semibold tracking-tight text-neutral-900">
-          Säljstöd
+        <Link href="/" className="flex shrink-0 items-center">
+          <Image
+            src="/na_foretag.png"
+            alt="Nils Ahlgren"
+            width={140}
+            height={32}
+            priority
+            className="h-10 w-auto"
+          />
+          <span className="sr-only">Säljstöd</span>
         </Link>
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
           {nav.map((n) => {
