@@ -61,8 +61,8 @@ const initialForm: ProductFormData = {
 };
 
 const contactDetails = [
-  "Nils Ahlgren AB • Västberga Allé 61, 126 30 Hägersten",
-  "info@nilsahlgren.se • +46 8 19 25 00 • www.nilsahlgren.se",
+  "Nils Ahlgren AB • Rörvägen 16, 136 50 Jordbro",
+  "info@nilsahlgren.se • +46 8 500 125 80 • www.nilsahlgren.se",
 ];
 
 async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
@@ -325,13 +325,13 @@ export default function ProduktbladPage() {
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
-      doc.text(form.title || "Produktblad", marginX + 8, 35);
+      doc.text(form.title || "Produktblad", marginX + 8, 30);
 
       if (form.articleNumber) {
         doc.setFont(baseFont, normalStyle);
         doc.setFontSize(11);
         doc.setTextColor(226, 232, 240);
-        doc.text(`Artikelnummer: ${form.articleNumber}`, marginX + 8, 42);
+        doc.text(`Artikelnummer: ${form.articleNumber}`, marginX + 8, 38);
       }
 
       let currentY = 52;
@@ -370,17 +370,12 @@ export default function ProduktbladPage() {
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(13);
       doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
-      doc.text("Produktinformation", infoTextX, currentY + 6);
 
       doc.setFont(baseFont, normalStyle);
       doc.setFontSize(11);
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      let infoTextY = currentY + 14;
+      let infoTextY = currentY + 0;
 
-      if (form.weight) {
-        doc.text(`Vikt: ${form.weight}`, infoTextX, infoTextY);
-        infoTextY += 6;
-      }
 
       if (form.link) {
         const buttonLabel = "Öppna produktsidan";
