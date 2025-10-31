@@ -102,7 +102,7 @@ export default function HomePage() {
         </div>
         <div className="pt-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Övriga verktyg</h3>
-          <div className="mt-3 max-w-xs">
+          <div className="mt-3 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
             {secondaryCards.map((card) => (
               <CardLink key={`${card.title}-${card.href}`} card={card} />
             ))}
