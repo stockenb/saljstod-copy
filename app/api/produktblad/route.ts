@@ -163,7 +163,6 @@ export async function GET(req: NextRequest) {
       ignoreAttributes: false,
       removeNSPrefix: true,
       parseTagValue: true,
-      parseNodeValue: true,
       trimValues: true,
     });
     const parsed = parser.parse(xml) as {
