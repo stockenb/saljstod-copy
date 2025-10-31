@@ -399,8 +399,12 @@ export default function ProduktbladPage() {
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
 
       const image = await convertImageToDataUrl(form.image);
-      let infoTextX = marginX;
-      let infoBottom = currentY;
+            const columnGap = 12;
+      let columnWidth = contentWidth;
+      let columnLimitY = currentY;
+      let descriptionStartY = currentY;
+      let imageLayout: { x: number; y: number; width: number; height: number; bottom: number } | null =
+        null;
 
       if (image) {
         try {
@@ -415,27 +419,28 @@ export default function ProduktbladPage() {
             imageWidth = (imageProps.width / imageProps.height) * imageHeight;
           }
 
-          const imageX = marginX;
+          const imageX = marginX + contentWidth - imageWidth;
           const imageY = currentY;
           doc.setDrawColor(226, 232, 240);
           doc.roundedRect(imageX - 1, imageY - 1, imageWidth + 2, imageHeight + 2, 3, 3);
           doc.addImage(image.dataUrl, image.format, imageX, imageY, imageWidth, imageHeight);
 
-          infoTextX = imageX + imageWidth + 12;
-          infoBottom = Math.max(infoBottom, imageY + imageHeight);
+          imageLayout = {
+            x: imageX,
+            y: imageY,
+            width: imageWidth,
+            height: imageHeight,
+            bottom: imageY + imageHeight,
+          };
+          columnWidth = Math.max(imageX - marginX - columnGap, 40);
+          columnLimitY = imageLayout.bottom;
         } catch (imageError) {
           console.warn("Kunde inte lägga till bild i PDF", imageError);
         }
       }
 
-      doc.setFont(baseFont, boldStyle);
-      doc.setFontSize(13);
-      doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
-
-      doc.setFont(baseFont, normalStyle);
-      doc.setFontSize(11);
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      let infoTextY = currentY + 0;
+      let buttonLayout: { x: number; y: number; width: number; height: number; bottom: number } | null =
+        null;
 
 
       if (form.link) {
@@ -447,26 +452,46 @@ export default function ProduktbladPage() {
         const paddingY = 3;
         const buttonWidth = labelWidth + paddingX * 2;
         const buttonHeight = doc.getFontSize() / doc.internal.scaleFactor + paddingY * 2;
-        const buttonX = infoTextX;
-        const buttonY = infoTextY + 1;
+         const buttonX = imageLayout ? imageLayout.x : marginX;
+        const buttonY = imageLayout ? imageLayout.bottom + 6 : currentY + 1;
+
+        buttonLayout = {
+          x: buttonX,
+          y: buttonY,
+          width: buttonWidth,
+          height: buttonHeight,
+          bottom: buttonY + buttonHeight,
+        };
 
         doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
-        doc.roundedRect(buttonX, buttonY, buttonWidth, buttonHeight, 2, 2, "F");
+        doc.roundedRect(buttonLayout.x, buttonLayout.y, buttonLayout.width, buttonLayout.height, 2, 2, "F");
         doc.setTextColor(255, 255, 255);
         doc.text(
           buttonLabel,
-          buttonX + paddingX,
-          buttonY + buttonHeight - paddingY - 1
+          buttonLayout.x + paddingX,
+          buttonLayout.y + buttonHeight - paddingY - 1
         );
-        doc.link(buttonX, buttonY, buttonWidth, buttonHeight, { url: form.link });
+doc.link(buttonLayout.x, buttonLayout.y, buttonLayout.width, buttonLayout.height, {
+          url: form.link,
+        });
 
         doc.setFont(baseFont, normalStyle);
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        infoTextY = buttonY + buttonHeight + 6;
+if (imageLayout) {
+          columnLimitY = Math.max(columnLimitY, buttonLayout.bottom);
+        } else {
+          columnLimitY = buttonLayout.bottom;
+          descriptionStartY = buttonLayout.bottom + 12;
+        }
+      } else if (!imageLayout) {
+        descriptionStartY = currentY;
       }
 
-      infoBottom = Math.max(infoBottom, infoTextY);
-      currentY = infoBottom + 12;
+      if (imageLayout && !form.link) {
+        descriptionStartY = currentY;      }
+
+            let descriptionBottom = Math.max(descriptionStartY, columnLimitY);
+
 
       if (form.description) {
         doc.setFont(baseFont, boldStyle);
@@ -474,15 +499,97 @@ export default function ProduktbladPage() {
         doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
         doc.text("Produktbeskrivning", marginX, currentY);
 
-        currentY += 8;
+        let textBaseline = descriptionStartY + 8;
         doc.setFont(baseFont, normalStyle);
         doc.setFontSize(11);
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        const descriptionLines = doc.splitTextToSize(form.description, contentWidth);
         const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
-        doc.text(descriptionLines, marginX, currentY);
-        currentY += descriptionLines.length * lineHeight + 6;
+        let lastLineBaseline: number | null = null;
+
+        const paragraphs = form.description.split(/\r?\n\s*\r?\n/);
+
+        for (const [index, paragraph] of paragraphs.entries()) {
+          const normalizedParagraph = paragraph.replace(/\r?\n/g, " ").trim();
+
+          if (index > 0) {
+            textBaseline += lineHeight;
+          }
+
+          if (!normalizedParagraph) {
+            continue;
+          }
+
+          const words = normalizedParagraph.split(/\s+/);
+          let currentLine = "";
+
+          const writeLine = (line: string) => {
+            if (!line) {
+              return;
+            }
+
+            const maxWidth =
+              imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const lineWidth =
+              doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+            if (lineWidth > maxWidth) {
+              const forcedLines = doc.splitTextToSize(line, maxWidth);
+              for (const forcedLine of forcedLines) {
+                doc.text(forcedLine, marginX, textBaseline);
+                lastLineBaseline = textBaseline;
+                textBaseline += lineHeight;
+              }
+            } else {
+              doc.text(line, marginX, textBaseline);
+              lastLineBaseline = textBaseline;
+              textBaseline += lineHeight;
+            }
+          };
+
+          for (const word of words) {
+            const maxWidth =
+              imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const candidate = currentLine ? `${currentLine} ${word}` : word;
+            const candidateWidth =
+              doc.getStringUnitWidth(candidate) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+            if (candidateWidth <= maxWidth) {
+              currentLine = candidate;
+            } else {
+              writeLine(currentLine);
+              currentLine = "";
+
+              const updatedMaxWidth =
+                imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+              const wordWidth =
+                doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+              if (wordWidth > updatedMaxWidth) {
+                const forcedLines = doc.splitTextToSize(word, updatedMaxWidth);
+                for (const forcedLine of forcedLines) {
+                  doc.text(forcedLine, marginX, textBaseline);
+                  lastLineBaseline = textBaseline;
+                  textBaseline += lineHeight;
+                }
+              } else {
+                currentLine = word;
+              }
+            }
+          }
+
+          if (currentLine) {
+            writeLine(currentLine);
+          }
+        }
+
+        if (lastLineBaseline) {
+          descriptionBottom = Math.max(columnLimitY, lastLineBaseline + 6);
+        } else {
+          descriptionBottom = Math.max(columnLimitY, descriptionStartY + 6);
+        }
       }
+       const layoutBottom = Math.max(columnLimitY, descriptionBottom);
+      currentY = layoutBottom + 12;
 
       const body = form.specs
         .filter((spec) => spec.key.trim() || spec.value.trim())
