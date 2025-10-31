@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const supabaseBrowser = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
+
+export const supabaseBrowser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./lib/supabase/env";
+
 const PROTECTED = ["/", "/rapporter", "/nyheter", "/profil", "/admin"];
 
 export async function middleware(req: NextRequest) {
@@ -10,17 +12,17 @@ export async function middleware(req: NextRequest) {
 
   let supabase: ReturnType<typeof createServerClient> | null = null;
   try {
-    supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: (name) => req.cookies.get(name)?.value,
-          set: (name, value, options) => res.cookies.set(name, value, options),
-          remove: (name, options) => res.cookies.set(name, "", { ...options, expires: new Date(0) }),
+    supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      cookies: {
+        getAll: () =>
+          req.cookies.getAll().map(({ name, value }) => ({ name, value })),
+        setAll: async (cookies) => {
+          for (const { name, value, options } of cookies) {
+            res.cookies.set(name, value, options ? { ...options } : undefined);
+          }
         },
-      }
-    );
+      },
+    });
     await supabase.auth.getUser().catch(() => undefined);
   } catch (error) {
     return res;
@@ -43,7 +45,11 @@ export async function middleware(req: NextRequest) {
   }
 
   if (path.startsWith("/admin")) {
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle<{ role: string | null }>();
     if (profile?.role !== "ADMIN") return NextResponse.redirect(new URL("/", nextUrl.origin));
   }
 
