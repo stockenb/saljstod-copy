@@ -43,6 +43,13 @@ const secondaryCards: Card[] = [
     emoji: "🏷️",
     variant: "compact" as const,
   },
+  {
+    href: "/produktblad",
+    title: "Skapa produktblad",
+    description: "Generera redigerbara produktblad som PDF.",
+    emoji: "📝",
+    variant: "compact" as const,
+  },
 ];
 
 function CardLink({ card }: { card: Card }) {
