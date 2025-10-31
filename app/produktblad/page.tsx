@@ -433,7 +433,7 @@ export default function ProduktbladPage() {
             bottom: imageY + imageHeight,
           };
           columnWidth = Math.max(imageX - marginX - columnGap, 40);
-          columnLimitY = imageLayout.bottom;
+          columnLimitY = imageLayout.bottom + 6;
         } catch (imageError) {
           console.warn("Kunde inte lägga till bild i PDF", imageError);
         }
