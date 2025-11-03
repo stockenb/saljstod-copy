@@ -1,97 +1,85 @@
 import Link from "next/link";
 
-const features = [
+type Card = {
+  href: string;
+  title: string;
+  description: string;
+  emoji: string;
+  variant?: "compact";
+};
+
+const primaryCards: Card[] = [
   {
-    emoji: "⚡",
-    title: "Snabba arbetsflöden",
-    description:
-      "Allt säljmateriel samlat på ett ställe gör att du slipper hoppa mellan verktyg och kan fokusera på kunden.",
+    href: "https://karta.nilsahlgren.se",
+    title: "Villastängsel",
+    description: "Planeringsstöd och resurser för villastängsel.",
+    emoji: "🏡",
   },
   {
-    emoji: "🧭",
-    title: "Tydlig vägledning",
-    description:
-      "Steg-för-steg-stöd för offert, uppföljning och leverans säkerställer en jämn upplevelse för varje kund.",
+    href: "https://karta.nilsahlgren.se",
+    title: "Industristängsel",
+    description: "Projektunderlag och översikter för industristängsel.",
+    emoji: "🏭",
   },
   {
-    emoji: "🤝",
-    title: "Delat kunnande",
-    description:
-      "Mallbibliotek, checklistor och färdigt bildmaterial gör det enkelt att dela bästa praxis inom teamet.",
+    href: "https://karta.nilsahlgren.se",
+    title: "Panelstängsel",
+    description: "Samlad information om panelstängselprojekt.",
+    emoji: "⛓️",
+  },
+  {
+    href: "https://karta.nilsahlgren.se",
+    title: "Viltstängsel",
+    description: "Resurser och verktyg för viltstängsel.",
+    emoji: "🦌",
   },
 ];
 
-const workflows = [
+const secondaryCards: Card[] = [
+  {
+    href: "https://karta.nilsahlgren.se",
+    title: "EAN",
+    description: "Snabb åtkomst till EAN-uppslag.",
+    emoji: "🏷️",
+    variant: "compact" as const,
+  },
   {
     href: "/produktblad",
     title: "Skapa produktblad",
-    description: "Bygg färdiga produktblad som PDF och anpassa dem innan kundmötet.",
-    emoji: "🛠️",
-    cta: "Öppna verktyget",
-  },
-  {
-    href: "https://nilsahlgren.se/media-kit",
-    title: "Mediabibliotek",
-    description: "Ladda ned logotyper, bilder och presentationsmaterial för din pitch.",
-    emoji: "🖼️",
-    cta: "Till resurserna",
-  },
-  {
-    href: "mailto:marketing@nilsahlgren.se",
-    title: "Beställ marknadsstöd",
-    description: "Behöver du kampanjmaterial eller hjälp med ett case? Kontakta marknadsteamet.",
-    emoji: "🎯",
-    cta: "Skicka e-post",
-  },
-  {
-    href: "https://nilsahlgren.se/utbildning",
-    title: "Utbildningar och guider",
-    description: "Se inspelade genomgångar och få manualer för våra vanligaste säljprocesser.",
-    emoji: "📚",
-    cta: "Utforska utbildningar",
+    description: "Generera redigerbara produktblad som PDF.",
+    emoji: "📝",
+    variant: "compact" as const,
   },
 ];
 
-const highlights = [
-  {
-    title: "Veckans fokus",
-    description: "Tema: Industristängsel – samla referenscase och uppdatera prislistan i säljteamets drive.",
-  },
-  {
-    title: "Ny resurs",
-    description: "Mall för kampanjmejl ligger nu i biblioteket under Kommunikation → Mallar.",
-  },
-  {
-    title: "Tips",
-    description: "Boka in en 10-minuters avstämning efter varje platsbesök för att fånga upp nästa steg direkt.",
-  },
-];
+function CardLink({ card }: { card: Card }) {
+  const isCompact = card.variant === "compact";
 
-function WorkflowCard({ workflow }: { workflow: (typeof workflows)[number] }) {
-  const isExternal = workflow.href.startsWith("http") || workflow.href.startsWith("mailto:");
+  const baseClasses =
+    "group flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400";
+  const padding = isCompact ? "p-4" : "p-6";
+  const titleClasses = `mt-4 font-semibold text-neutral-900 ${isCompact ? "text-lg" : "text-xl"}`;
+  const descriptionClasses = `mt-2 text-neutral-600 ${isCompact ? "text-xs" : "text-sm"}`;
+  const ctaClasses = `mt-auto inline-flex items-center gap-1 pt-6 font-medium text-neutral-900 ${
+    isCompact ? "text-xs" : "text-sm"
+  }`;
 
   return (
     <Link
-      href={workflow.href}
-      target={isExternal ? "_blank" : undefined}
-      rel={isExternal ? "noreferrer" : undefined}
-      className="card group flex h-full flex-col gap-4 p-6 transition-colors duration-calm ease-calm"
+      key={`${card.title}-${card.href}`}
+      href={card.href}
+      target="_blank"
+      rel="noreferrer"
+      className={`${baseClasses} ${padding}`}
     >
-      <span className="text-4xl" aria-hidden>
-        {workflow.emoji}
-      </span>
-      <h2 className="font-heading text-xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-        {workflow.title}
-      </h2>
-      <p className="text-sm text-neutral-600 dark:text-neutral-300">{workflow.description}</p>
-      <span className="mt-auto inline-flex items-center gap-2 pt-4 text-sm font-medium text-neutral-900 transition-colors duration-calm ease-calm group-hover:text-primary-600 dark:text-neutral-100">
-        {workflow.cta}
-        <span
-          aria-hidden
-          className="translate-x-0 text-base transition-transform duration-calm ease-calm group-hover:translate-x-1"
-        >
-          →
-        </span>
+      <div className={isCompact ? "text-3xl" : "text-4xl"} aria-hidden>
+        {card.emoji}
+      </div>
+      <h2 className={titleClasses}>{card.title}</h2>
+      <p className={descriptionClasses}>{card.description}</p>
+      <span className={ctaClasses}>
+        Öppna
+        <span className="transition-transform group-hover:translate-x-0.5">→</span>
       </span>
     </Link>
   );
@@ -99,73 +87,28 @@ function WorkflowCard({ workflow }: { workflow: (typeof workflows)[number] }) {
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col gap-14 pb-20">
-      <header className="flex flex-col gap-5">
-        <span className="pill-chip w-fit bg-white/70 text-neutral-600 dark:bg-neutral-900/70 dark:text-neutral-200">Säljstöd</span>
-        <div className="max-w-2xl space-y-4">
-          <h1 className="text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white sm:text-5xl">
-            Ditt nav för allt säljmaterial hos Nils Ahlgren
-          </h1>
-          <p className="text-base text-neutral-600 dark:text-neutral-300">
-            Här samlar vi verktyg, guider och mallar som hjälper dig att leverera en proffsig kundupplevelse – utan att behöva logga in i flera system.
+    <main className="min-h-screen w-full bg-neutral-50">
+      <section className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-16">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Välj verktyg</h1>
+          <p className="mt-2 text-sm text-neutral-600">
+            Välj vilket intranätsverktyg du vill öppna.
           </p>
         </div>
-      </header>
-
-      <section className="grid gap-6 sm:grid-cols-3">
-        {features.map((feature) => (
-          <div key={feature.title} className="card flex flex-col gap-3 p-6">
-            <span className="text-3xl" aria-hidden>
-              {feature.emoji}
-            </span>
-            <h2 className="font-heading text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">
-              {feature.title}
-            </h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">{feature.description}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">Kom igång snabbt</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Öppna våra mest använda resurser och verktyg direkt härifrån.
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {workflows.map((workflow) => (
-            <WorkflowCard key={workflow.title} workflow={workflow} />
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          {primaryCards.map((card) => (
+            <CardLink key={`${card.title}-${card.href}`} card={card} />
           ))}
         </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="card flex flex-col gap-4 p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Aktuellt i teamet</h2>
-          <ul className="space-y-3 text-sm text-neutral-600 dark:text-neutral-300">
-            {highlights.map((item) => (
-              <li key={item.title} className="rounded-xl bg-white/60 p-3 dark:bg-neutral-900/60">
-                <p className="font-medium text-neutral-900 dark:text-neutral-100">{item.title}</p>
-                <p className="text-neutral-600 dark:text-neutral-300">{item.description}</p>
-              </li>
+        <div className="pt-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Övriga verktyg</h3>
+          <div className="mt-3 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+            {secondaryCards.map((card) => (
+              <CardLink key={`${card.title}-${card.href}`} card={card} />
             ))}
-          </ul>
-        </div>
-        <div className="card flex flex-col gap-4 p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-neutral-900 dark:text-white">Behöver du hjälp?</h2>
-          <p className="text-sm text-neutral-600 dark:text-neutral-300">
-            Kontakta oss så ser vi till att du får rätt underlag. Ange kund, projekt och önskat material så hör vi av oss.
-          </p>
-          <div className="rounded-xl bg-neutral-900/5 p-4 text-sm text-neutral-700 dark:bg-white/5 dark:text-neutral-200">
-            <p className="font-medium">Säljstöd &amp; marknad</p>
-            <p>marketing@nilsahlgren.se</p>
-            <p>08-500 125 80</p>
           </div>
         </div>
       </section>
-    </div>
+    </main>
   );
 }
