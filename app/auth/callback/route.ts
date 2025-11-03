@@ -18,6 +18,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const code = url.searchParams.get("code");
+    const codeVerifier =
+      url.searchParams.get("code_verifier") ??
+      url.searchParams.get("codeVerifier") ??
+      url.searchParams.get("code-verifier") ??
+      null;
+    const codeVerifierFromCookies =
+      request.cookies
+        .getAll()
+        .find((cookie) => cookie.name.endsWith("-code-verifier"))?.value ?? null;
     const next =
       url.searchParams.get("redirect") ||
       url.searchParams.get("next") ||
@@ -29,6 +38,13 @@ export async function GET(request: NextRequest) {
       return fail("missing_code_param");
     }
 
+    if (!codeVerifier && !codeVerifierFromCookies) {
+      console.error(
+        "[auth/callback] missing code_verifier (neither query param nor cookie present).",
+      );
+      return fail("missing_code_verifier");
+    }
+
     // Förbered tre svar där vi kan skriva cookies (oavsett utfall)
     const redirectOnSuccess = NextResponse.redirect(
       `${origin}${next.startsWith("/") ? next : "/"}`
@@ -37,7 +53,16 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
+        get: (name: string) => {
+          const existing = request.cookies.get(name)?.value;
+          if (existing) return existing;
+
+          if (codeVerifier && name.endsWith("-code-verifier")) {
+            return codeVerifier;
+          }
+
+          return undefined;
+        },
         set: (name: string, value: string, options?: CookieOptions) => {
           const opt = options ?? {};
           redirectOnSuccess.cookies.set({ name, value, ...opt });
