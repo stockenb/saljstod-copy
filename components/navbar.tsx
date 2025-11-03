@@ -13,10 +13,10 @@ export function Navbar() {
   const nav = useMemo(
     () => [
       { href: "/", label: "Hem" },
-      { href: "/besoksrapporter", label: "Kunder" },
-      { href: "/rapporter", label: "Rapporter" },
-      { href: "/nyheter", label: "Nyheter" },
-      { href: "/profil", label: "Profil" },
+     // { href: "/besoksrapporter", label: "Kunder" },
+     // { href: "/rapporter", label: "Rapporter" },
+     // { href: "/nyheter", label: "Nyheter" },
+     // { href: "/profil", label: "Profil" },
     ],
     []
   );
@@ -68,7 +68,7 @@ export function Navbar() {
           })}
         </nav>
         <div className="text-xs font-medium uppercase tracking-[0.3em] text-neutral-400">
-          Inloggning inaktiverad
+          2025
         </div>
       </div>
       {breadcrumbItems.length ? (
