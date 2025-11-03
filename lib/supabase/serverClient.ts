@@ -1,19 +1,46 @@
-// lib/supabase/env.ts
-function mustGet(name: string): string {
-  const v = process.env[name];
-  if (!v) {
-    throw new Error(`[env] Missing required env var: ${name}`);
-  }
-  return v;
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { cookies, headers } from "next/headers";
+
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./env";
+
+let hasWarnedReadonly = false;
+
+function tryMutateCookies(
+  action: (store: ReturnType<typeof cookies>, name: string, value?: string, options?: CookieOptions) => void
+) {
+  return (name: string, value?: string, options?: CookieOptions) => {
+    const store = cookies();
+    try {
+      action(store, name, value, options);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production" && !hasWarnedReadonly) {
+        console.warn("[supabase] Unable to mutate cookies in this context. Session persistence may be skipped.");
+        hasWarnedReadonly = true;
+      }
+    }
+  };
 }
 
-// Publikt (används i browsern)
-export const NEXT_PUBLIC_SUPABASE_URL = mustGet("NEXT_PUBLIC_SUPABASE_URL");
-export const NEXT_PUBLIC_SUPABASE_ANON_KEY = mustGet("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+export function getSupabaseServer() {
+  const cookieStore = cookies();
+  const headerStore = headers();
 
-// Server (återanvänd publika om separata saknas)
-export const SUPABASE_URL =
-  process.env.SUPABASE_URL ?? NEXT_PUBLIC_SUPABASE_URL;
-
-export const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ?? NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      set: tryMutateCookies((store, name, value = "", options) => {
+        (store as any).set?.({ name, value, ...(options ?? {}) });
+      }),
+      remove: tryMutateCookies((store, name, _value, options) => {
+        (store as any).set?.({ name, value: "", ...(options ?? {}) });
+      }),
+    },
+    headers: {
+      get(name: string) {
+        return headerStore.get(name) ?? undefined;
+      },
+    },
+  });
+}
