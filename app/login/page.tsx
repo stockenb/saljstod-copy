@@ -58,22 +58,23 @@ export default function LoginPage() {
     setStatus("processing");
     setMessage("Skickar länk…");
     try {
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL;
+      // ...inne i onSubmit, före signInWithOtp:
+const origin =
+  typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL;
 
-      // Vi pekar magic-linken till vår server-side callback och skickar med next-param
-      const redirectUrl =
-        nextParam && nextParam !== "/"
-          ? `${origin}/auth/callback?next=${encodeURIComponent(nextParam)}`
-          : `${origin}/auth/callback`;
+// ALLTID ha en query (?next=...), även om det bara är "/"
+const redirectUrl = `${origin}/auth/callback?next=${encodeURIComponent(nextParam || "/")}`;
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: redirectUrl,
-          // shouldCreateUser: false, // avkommentera om endast redan skapade användare ska kunna logga in
-        },
-      });
+// (valfritt) debugga lokalt:
+console.log("emailRedirectTo =>", redirectUrl);
+
+const { error } = await supabase.auth.signInWithOtp({
+  email,
+  options: {
+    emailRedirectTo: redirectUrl,
+  },
+});
+
 
       if (error) throw error;
 
