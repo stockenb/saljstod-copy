@@ -24,6 +24,18 @@ export default function LoginPage() {
     return r.startsWith("/") ? r : "/";
   }, [searchParams]);
 
+  // Fånga gamla hash-baserade länkar (signerar inte in längre)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.location.hash.includes("access_token=")) return;
+
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState({}, "", cleanUrl);
+
+    setStatus("error");
+    setMessage("Din länk är för gammal. Begär en ny magisk länk.");
+  }, []);
+
   // Visa ev. fel från callbacken (?error=...)
   useEffect(() => {
     const errorParam = searchParams.get("error");
