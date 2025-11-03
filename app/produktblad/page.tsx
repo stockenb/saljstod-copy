@@ -69,10 +69,67 @@ const contactDetails = [
 
 const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
 
+function normalizeUrl(raw: string): string {
+  // Låt data-URL:er vara
+  if (!raw) return raw;
+  if (raw.startsWith("data:image/")) return raw;
+
+  try {
+    // Encoda path-delen, behåll query/hash
+    const [base, rest] = raw.split(/([?#].*)/);
+    return encodeURI(base) + (rest ?? "");
+  } catch {
+    // Sista utväg: ersätt bara mellanslag
+    return raw.replace(/ /g, "%20");
+  }
+}
+
+// --- Bildhjälpare (rasterisera till JPEG så jsPDF aldrig ser "UNKNOWN") ---
+
+async function loadHtmlImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    // För data-URL behövs inte CORS
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Tar en PdfImage (kan vara PNG/JPEG/WEBP) och rasteriserar den till JPEG.
+ * Returnerar { dataUrl, width, height } baserat på bildens naturliga storlek.
+ */
+async function rasterizeToJpeg(
+  pdfImage: PdfImage,
+  quality = 0.92
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  const img = await loadHtmlImageFromDataUrl(pdfImage.dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Kunde inte skapa 2D-kontext");
+
+  // Vit bakgrund → undvik svart vid transparenta PNG/WebP
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", quality);
+  return {
+    dataUrl,
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
 async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
   if (!source) {
     return null;
   }
+  // Normalisera URL innan allt annat
+  const src = normalizeUrl(source);
 
   const parseDataUrl = (dataUrl: string): PdfImage | null => {
     const formatMatch = dataUrl.match(/^data:image\/(png|jpe?g|webp)/i);
@@ -86,8 +143,8 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
     return { dataUrl, format: "PNG" };
   };
 
-  if (source.startsWith("data:image/")) {
-    return parseDataUrl(source);
+  if (src.startsWith("data:image/")) {
+    return parseDataUrl(src);
   }
 
   const blobToPdfImage = async (blob: Blob) =>
@@ -99,7 +156,6 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
           resolve(null);
           return;
         }
-
         resolve(parseDataUrl(result));
       };
       reader.onerror = () => reject(reader.error);
@@ -108,11 +164,10 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
 
   const tryDirectFetch = async () => {
     try {
-      const response = await fetch(source);
+      const response = await fetch(src);
       if (!response.ok) {
         return null;
       }
-
       const blob = await response.blob();
       return await blobToPdfImage(blob);
     } catch (error) {
@@ -123,15 +178,13 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
 
   const tryProxyFetch = async () => {
     try {
-      const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(source)}`;
+      const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(src)}`;
       const response = await fetch(proxyUrl);
       if (!response.ok) {
         return null;
       }
 
-      const data = (await response.json().catch(() => null)) as
-        | { dataUrl?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as { dataUrl?: string } | null;
 
       if (!data?.dataUrl) {
         return null;
@@ -206,10 +259,7 @@ async function loadFontBase64(variant: PoppinsFontVariant) {
 
 async function ensurePoppinsFonts(doc: jsPDF) {
   try {
-    const [regular, semiBold] = await Promise.all([
-      loadFontBase64("regular"),
-      loadFontBase64("semiBold"),
-    ]);
+    const [regular, semiBold] = await Promise.all([loadFontBase64("regular"), loadFontBase64("semiBold")]);
 
     doc.addFileToVFS(POPPINS_FONT_FILES.regular, regular);
     doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal");
@@ -410,7 +460,7 @@ export default function ProduktbladPage() {
           console.warn("Kunde inte lägga till logotyp i PDF", logoError);
         }
       }
-      
+
       doc.setFillColor(15, 23, 42);
       doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
       doc.setFont(baseFont, boldStyle);
@@ -429,7 +479,7 @@ export default function ProduktbladPage() {
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
 
       const image = await convertImageToDataUrl(form.image);
-            const columnGap = 12;
+      const columnGap = 12;
       let columnWidth = contentWidth;
       let columnLimitY = currentY;
       let descriptionStartY = currentY;
@@ -438,22 +488,26 @@ export default function ProduktbladPage() {
 
       if (image) {
         try {
-          const imageProps = doc.getImageProperties(image.dataUrl);
+          // Rasterisera till JPEG och använd naturliga mått
+          const raster = await rasterizeToJpeg(image); // { dataUrl, width, height }
+
           const maxImageWidth = 70;
           const maxImageHeight = 70;
           let imageWidth = maxImageWidth;
-          let imageHeight = (imageProps.height / imageProps.width) * imageWidth;
+          let imageHeight = (raster.height / raster.width) * imageWidth;
 
           if (imageHeight > maxImageHeight) {
             imageHeight = maxImageHeight;
-            imageWidth = (imageProps.width / imageProps.height) * imageHeight;
+            imageWidth = (raster.width / raster.height) * imageHeight;
           }
 
           const imageX = marginX + contentWidth - imageWidth;
           const imageY = currentY;
           doc.setDrawColor(226, 232, 240);
           doc.roundedRect(imageX - 1, imageY - 1, imageWidth + 2, imageHeight + 2, 3, 3);
-          doc.addImage(image.dataUrl, image.format, imageX, imageY, imageWidth, imageHeight);
+
+          // Lägg in som JPEG oavsett ursprungligt format
+          doc.addImage(raster.dataUrl, "JPEG", imageX, imageY, imageWidth, imageHeight);
 
           imageLayout = {
             x: imageX,
@@ -472,17 +526,15 @@ export default function ProduktbladPage() {
       let buttonLayout: { x: number; y: number; width: number; height: number; bottom: number } | null =
         null;
 
-
       if (form.link) {
         const buttonLabel = "Öppna produktsidan";
         doc.setFont(baseFont, boldStyle);
-        const labelWidth =
-          doc.getStringUnitWidth(buttonLabel) * (doc.getFontSize() / doc.internal.scaleFactor);
+        const labelWidth = doc.getStringUnitWidth(buttonLabel) * (doc.getFontSize() / doc.internal.scaleFactor);
         const paddingX = 6;
         const paddingY = 3;
         const buttonWidth = labelWidth + paddingX * 2;
         const buttonHeight = doc.getFontSize() / doc.internal.scaleFactor + paddingY * 2;
-         const buttonX = imageLayout ? imageLayout.x : marginX;
+        const buttonX = imageLayout ? imageLayout.x : marginX;
         const buttonY = imageLayout ? imageLayout.bottom + 6 : currentY + 1;
 
         buttonLayout = {
@@ -496,18 +548,12 @@ export default function ProduktbladPage() {
         doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
         doc.roundedRect(buttonLayout.x, buttonLayout.y, buttonLayout.width, buttonLayout.height, 2, 2, "F");
         doc.setTextColor(255, 255, 255);
-        doc.text(
-          buttonLabel,
-          buttonLayout.x + paddingX,
-          buttonLayout.y + buttonHeight - paddingY - 1
-        );
-doc.link(buttonLayout.x, buttonLayout.y, buttonLayout.width, buttonLayout.height, {
-          url: form.link,
-        });
+        doc.text(buttonLabel, buttonLayout.x + paddingX, buttonLayout.y + buttonHeight - paddingY - 1);
+        doc.link(buttonLayout.x, buttonLayout.y, buttonLayout.width, buttonLayout.height, { url: form.link });
 
         doc.setFont(baseFont, normalStyle);
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-if (imageLayout) {
+        if (imageLayout) {
           columnLimitY = Math.max(columnLimitY, buttonLayout.bottom);
         } else {
           columnLimitY = buttonLayout.bottom;
@@ -518,10 +564,10 @@ if (imageLayout) {
       }
 
       if (imageLayout && !form.link) {
-        descriptionStartY = currentY;      }
+        descriptionStartY = currentY;
+      }
 
-            let descriptionBottom = Math.max(descriptionStartY, columnLimitY);
-
+      let descriptionBottom = Math.max(descriptionStartY, columnLimitY);
 
       if (form.description) {
         doc.setFont(baseFont, boldStyle);
@@ -557,10 +603,8 @@ if (imageLayout) {
               return;
             }
 
-            const maxWidth =
-              imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-            const lineWidth =
-              doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
+            const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const lineWidth = doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
 
             if (lineWidth > maxWidth) {
               const forcedLines = doc.splitTextToSize(line, maxWidth);
@@ -577,8 +621,7 @@ if (imageLayout) {
           };
 
           for (const word of words) {
-            const maxWidth =
-              imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
             const candidate = currentLine ? `${currentLine} ${word}` : word;
             const candidateWidth =
               doc.getStringUnitWidth(candidate) * (doc.getFontSize() / doc.internal.scaleFactor);
@@ -589,10 +632,8 @@ if (imageLayout) {
               writeLine(currentLine);
               currentLine = "";
 
-              const updatedMaxWidth =
-                imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-              const wordWidth =
-                doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
+              const updatedMaxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+              const wordWidth = doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
 
               if (wordWidth > updatedMaxWidth) {
                 const forcedLines = doc.splitTextToSize(word, updatedMaxWidth);
@@ -618,7 +659,7 @@ if (imageLayout) {
           descriptionBottom = Math.max(columnLimitY, descriptionStartY + 6);
         }
       }
-       const layoutBottom = Math.max(columnLimitY, descriptionBottom);
+      const layoutBottom = Math.max(columnLimitY, descriptionBottom);
       currentY = layoutBottom + 12;
 
       const body = form.specs

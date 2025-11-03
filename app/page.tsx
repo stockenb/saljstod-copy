@@ -37,7 +37,7 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
-    href: "https://ean-zeta.vercel.app/",
+    href: "/ean",
     title: "Skapa EAN",
     description: "Skapa egna EAN13-koder",
     emoji: "🏷️",
