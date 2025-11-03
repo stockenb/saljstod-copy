@@ -1,16 +1,13 @@
-function mustGet(value: string | undefined, name: string): string {
+function mustGet(name: string): string {
+  const value = process.env[name];
   if (!value) {
     throw new Error(`[env] Missing required env var: ${name}`);
   }
   return value;
 }
 
-export const NEXT_PUBLIC_SUPABASE_URL = mustGet(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  "NEXT_PUBLIC_SUPABASE_URL"
-);
+export const NEXT_PUBLIC_SUPABASE_URL = mustGet("NEXT_PUBLIC_SUPABASE_URL");
 export const NEXT_PUBLIC_SUPABASE_ANON_KEY = mustGet(
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   "NEXT_PUBLIC_SUPABASE_ANON_KEY"
 );
 
