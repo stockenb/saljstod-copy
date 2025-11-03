@@ -1,30 +1,13 @@
-import { redirect } from "next/navigation";
-
-import { getSupabaseServer } from "@/lib/supabase/serverClient";
-import { createReport } from "@/app/rapporter/actions";
-
-import { NewReportForm } from "./report-form";
-
-export default async function NewReportPage({ searchParams }: { searchParams: { customer_id?: string } }) {
-  const supabase = getSupabaseServer();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("id,name,address_line,postal_code,city,email,phone")
-    .order("name", { ascending: true });
-
-  const selectedCustomer = customers?.find((c) => c.id === searchParams.customer_id) ?? null;
-
-  async function action(formData: FormData) {
-    "use server";
-    const res = await createReport(formData);
-    redirect(`/rapporter/${res.id}`);
-  }
-
+export default function NewReportPage() {
   return (
-    <NewReportForm
-      action={action}
-      customers={customers ?? []}
-      selectedCustomer={selectedCustomer}
-    />
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Rapporter</span>
+        <h1>Skapa ny rapport</h1>
+        <p className="text-sm text-neutral-500">
+          Formuläret är inaktiverat tills Supabase och datalagring återinförs.
+        </p>
+      </header>
+    </div>
   );
 }

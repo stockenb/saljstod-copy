@@ -23,6 +23,10 @@
         "./*"
       ]
     },
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ],
     "forceConsistentCasingInFileNames": true,
     "plugins": [
       {
