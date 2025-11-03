@@ -3,23 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
+
 import { cn } from "@/lib/utils";
-import { LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
 
-export function Navbar({ role }: { role?: string | null }) {
+export function Navbar() {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
-  const nav = [
-    { href: "/", label: "Hem" },
-    ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/besoksrapporter", label: "Kunder" }] : []),
-    ...(role === "SKRUV" || role === "ADMIN" ? [{ href: "/rapporter", label: "Rapporter" }] : []),
-    { href: "/nyheter", label: "Nyheter" },
-    { href: "/profil", label: "Profil" },
-  ];
+  const nav = useMemo(
+    () => [
+      { href: "/", label: "Hem" },
+      { href: "/besoksrapporter", label: "Kunder" },
+      { href: "/rapporter", label: "Rapporter" },
+      { href: "/nyheter", label: "Nyheter" },
+      { href: "/profil", label: "Profil" },
+    ],
+    []
+  );
 
   const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
   const breadcrumbItems = useMemo(() => {
@@ -66,23 +66,10 @@ export function Navbar({ role }: { role?: string | null }) {
               </Link>
             );
           })}
-          {mounted && role === "ADMIN" && (
-            <Link
-              href="/admin/nyheter"
-              className={cn(
-                "flex items-center gap-2 rounded-full px-3 py-1.5 transition duration-200 ease-out",
-                pathname.startsWith("/admin") ? "bg-neutral-900 text-white shadow" : "text-neutral-500 hover:text-neutral-900"
-              )}
-            >
-              Admin
-            </Link>
-          )}
         </nav>
-        <form action="/logout" method="post" className="ml-auto">
-          <Button type="submit" size="sm" variant="secondary" className="rounded-full border border-neutral-200 bg-white/80 text-neutral-700 shadow-sm hover:border-neutral-300 hover:bg-white">
-            <LogOut className="mr-2 h-4 w-4" /> Logga ut
-          </Button>
-        </form>
+        <div className="text-xs font-medium uppercase tracking-[0.3em] text-neutral-400">
+          Inloggning inaktiverad
+        </div>
       </div>
       {breadcrumbItems.length ? (
         <div className="border-t border-white/70 bg-white/60 py-2">

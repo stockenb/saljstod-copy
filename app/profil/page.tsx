@@ -2,35 +2,27 @@
 
 import { useEffect, useState } from "react";
 
-import { supabaseBrowser } from "@/lib/supabase/browserClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ProfilePage() {
-  const [email, setEmail] = useState<string>("");
-  const [role, setRole] = useState<string>("");
+  const [theme, setTheme] = useState("light");
 
   useEffect(() => {
-    const client = supabaseBrowser;
-    (async () => {
-      const { data: { user } } = await client.auth.getUser();
-      setEmail(user?.email || "");
-      const { data } = await client.from("profiles").select("role").eq("id", user?.id).maybeSingle();
-      setRole(data?.role || "");
-    })();
+    const stored = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
+    if (stored === "dark") {
+      document.documentElement.classList.add("dark");
+      setTheme("dark");
+    }
   }, []);
 
   function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.classList.toggle("dark");
     localStorage.setItem("theme", isDark ? "dark" : "light");
+    setTheme(isDark ? "dark" : "light");
   }
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "dark") document.documentElement.classList.add("dark");
-  }, []);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -38,26 +30,26 @@ export default function ProfilePage() {
         <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Profil</span>
         <h1>Profil &amp; inställningar</h1>
         <p className="text-sm text-neutral-500">
-          Hantera dina personliga uppgifter och inställningar för intranätet.
+          Autentisering är inaktiverad just nu. När inloggning återinförs kommer kontouppgifter visas här.
         </p>
       </header>
 
       <Card>
         <CardHeader>
           <CardTitle>Dina uppgifter</CardTitle>
-          <CardDescription>Informationen hämtas automatiskt från ditt konto.</CardDescription>
+          <CardDescription>Ingen användarinformation är laddad.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-1">
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">E-post</div>
             <div className="rounded-2xl border border-surface-border/80 bg-white/90 px-4 py-3 text-sm font-medium text-neutral-800 dark:border-surface-dark-border/60 dark:bg-neutral-900/80 dark:text-neutral-100">
-              {email}
+              ej tillgängligt
             </div>
           </div>
           <div className="space-y-1">
             <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Roll</div>
             <div className="flex items-center gap-2">
-              <Badge variant="neutral">{role || "-"}</Badge>
+              <Badge variant="neutral">okänd</Badge>
             </div>
           </div>
         </CardContent>
@@ -71,9 +63,7 @@ export default function ProfilePage() {
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-neutral-500">
             Nuvarande läge:
-            <span className="ml-2 font-medium text-neutral-800 dark:text-neutral-200">
-              {typeof window !== "undefined" && document.documentElement.classList.contains("dark") ? "Mörkt" : "Ljust"}
-            </span>
+            <span className="ml-2 font-medium text-neutral-800 dark:text-neutral-200">{theme === "dark" ? "Mörkt" : "Ljust"}</span>
           </div>
           <Button onClick={toggleTheme} variant="secondary">
             Växla mörkt läge

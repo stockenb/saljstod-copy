@@ -1,119 +1,52 @@
-# Säljstöd NA — Next.js 14 + Supabase (magic link)
+# Säljstöd NA — Next.js 14
 
-Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn-stil + lucide-react + Framer Motion** och **Supabase** (auth + Postgres).
+Ett minimalistiskt internt säljverktyg byggt med **Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn-stil + lucide-react + Framer Motion**. Projektet körs just nu helt utan Supabase eller autentisering.
 
-## Funktioner (MVP)
-- Magic link-inloggning (Supabase).
-- Dashboard med nyheter (pinnade först) och rollanpassade moduler.
-- Besöksrapporter: kundregister, lista med filter/sök, skapa/redigera, detalj med tidslinje, markera uppföljning klar, **Exportera CSV/PDF**.
-- Nyheter: lista + detalj (Markdown), admin-CRUD under `/admin/nyheter` (**endast ADMIN**).
-- Profil & inställningar: e-post, roll, mörkt läge (lokalt).
-- Behörighet via `profiles.role` (ADMIN/SKRUV/STANGSEL) och RLS-policies.
-- Audit-loggar för viktiga händelser.
+## Aktuell status
+- Supabase-integration (auth, Postgres, middleware) är borttagen.
+- Alla sidor renderar utan krav på inloggning och visar statisk information eller platshållare.
+- API-rutter och server actions som tidigare skrev till databasen returnerar nu ett kontrollerat felmeddelande.
 
 ## Kom igång
-1) Skapa ett Supabase-projekt. Hämta:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE` (behövs för scriptet nedan)
-2) Konfigurera miljövariabler:
+1. Installera beroenden:
    ```bash
-   cp .env.example .env.local
-   # Fyll i .env.local (inkl. NEXT_PUBLIC_SITE_URL=http://localhost:3000)
+   npm install
    ```
-3) Skapa tabeller + policies (kör i Supabase SQL Editor):
-   - Kör `supabase/sql/schema.sql`
-   - Kör `supabase/sql/policies.sql`
-   - Om du satte upp databasen innan 2024-05-22, kör även patchen `supabase/sql/patches/20240522_customer_contacts.sql` för att lägga till kontaktpersoner-tabellen.
-4) Installera beroenden:
-   ```bash
-   npm i
-   ```
-5) Seed (frivilligt): `supabase/sql/seed.sql`
-6) Starta dev:
+2. Starta utvecklingsservern:
    ```bash
    npm run dev
    ```
+   Appen är tillgänglig på `http://localhost:3000` och kräver ingen inloggning.
 
-   Kommandot ovan startar utvecklingsservern för huvudappen på port **3000**.
-
-## Auth flow & ENV
-
-### Obligatoriska miljövariabler
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_URL` (valfri, annars används värdet från `NEXT_PUBLIC_SUPABASE_URL` på serversidan)
-- `SUPABASE_ANON_KEY` (valfri, annars används `NEXT_PUBLIC_SUPABASE_ANON_KEY` på serversidan)
-
-Vid build/start kastar appen fel om `NEXT_PUBLIC_SUPABASE_URL` eller `NEXT_PUBLIC_SUPABASE_ANON_KEY` saknas.
-
-### Supabase → Auth → URL Configuration
-- **Site URL**: `https://saljstod.vercel.app`
-- **Additional Redirect URLs**: `https://saljstod-f4ou02w1x-stockenbs-projects.vercel.app`, `http://localhost:3000`
-- Magic links pekar mot `https://…/auth/callback` (authorization code flow).
-
-### Login-flödet
-1. `/login` skickar `signInWithOtp` med `emailRedirectTo = {origin}/auth/callback?next=…`.
-2. `/auth/callback` byter Supabase-koden mot session, sätter cookies och redirectar vidare.
-3. Middleware skyddar sidor i `PROTECTED` och redirectar oinloggade till `/login?next=/sidan`.
-4. Gamla hash-baserade länkar (`#access_token=`) fångas på `/login` och uppmanar användaren att begära ny länk.
-
-`next`-parametern måste börja på `/`. Annars faller redirecten tillbaka till `/`.
-
-### Testa lokalt
-1. Lägg envs i `./.env.local` (laddas av Next).
-2. Starta `npm run dev`.
-3. Öppna `http://localhost:3000/login?next=/` och begär en länk.
-4. Följ länken → du landar på `/auth/callback?code=…&next=/` → redirect till `/` med Supabase-cookies satta.
-5. Kontrollera i DevTools → Application → Cookies att Supabase-cookies finns på `localhost`.
-
-### Skicka invites / magiska länkar (rekommenderat)
-Scriptet skapar användarna och sätter deras roll i `profiles`:
-```bash
-npm run invite:users
+## Projektstruktur
 ```
-Fördefinierade konton:
-- ADMIN: `oliver.bentzer@nilsahlgren.se`
-- STANGSEL: `info@dovas.se`
-- SKRUV: `oskar.tylebrink@nilsahlgren.se`
-
-Alternativt: Supabase Dashboard → Auth → Users → **Invite**. Skapa sedan rader i `public.profiles` med rätt `id`/`email`/`role`.
-
-## Struktur
-```
-/app
-  /auth/callback/route.ts     -- tar emot kod och skapar session
-  /login/page.tsx             -- magic link-login
-  /logout/route.ts            -- POST sign-out
-  /admin/nyheter/page.tsx     -- ADMIN-CRUD för nyheter
-  /nyheter/..., /rapporter/... -- nyheter och besöksrapporter
-  layout.tsx, page.tsx
-/components/ui                -- shadcn-liknande UI-komponenter
-/lib/supabase                 -- server/client helpers (SSR cookies)
-/lib/rbac.ts                  -- rollhämtning
-/lib/audit.ts                 -- audit log helper
-/supabase/sql                 -- schema, policies, seed
-/scripts/invite-users.ts      -- skicka invites/magiska länkar
+/app                     -- App Router-sidor och API-rutter
+/components              -- Delade UI-komponenter
+/design                  -- Designfiler och prototyper
+/lib                      -- Diverse hjälpfunktioner (utan Supabase)
+/public                  -- Statisk media
+/scripts                 -- Hjälpskript (Supabase-skriptet är inaktivt)
+/supabase                -- Tidigare SQL-skript (behålls som referens)
 ```
 
-## Behörighet & RLS
-- **ADMIN**: full åtkomst till rapporter + nyhets-CRUD.
-- **SKRUV**: Kundregister och rapporter för egna kunder.
-- **STANGSEL**: Dashboard med offertmodul (kommer snart) och nyheter.
-- Se `supabase/sql/policies.sql` för exakta policies.
+## Återinföra autentisering och Supabase (översikt)
+Vill du aktivera Supabase igen? Följ i korthet dessa steg:
+1. Installera Supabase-paketen:
+   ```bash
+   npm install @supabase/supabase-js @supabase/ssr
+   ```
+2. Återställ hjälpfilerna i `lib/supabase/` (klienter för browser/server) och uppdatera berörda sidor att använda dem för datahämtning.
+3. Lägg tillbaka middleware med `createServerClient` för att skydda rutter.
+4. Återinför `/auth/callback`, `/logout` samt Supabase-anropen i `app/**/actions.ts` och API-rutterna.
+5. Sätt miljövariabler (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE` m.fl.) lokalt och i Vercel.
+6. Om SQL-schemat behöver återskapas: kör filerna i `supabase/sql/` i ditt Supabase-projekt.
 
-## Tillgänglighet
-- Semantiska element, fokusstilar, kontrast, respekt för `prefers-reduced-motion` i CSS (och subtila animationer).
+> Tips: ta bort gamla Supabase-miljövariabler i Vercel om de inte längre används.
+
+## Designprinciper
+- Premium/minimalistisk känsla med hairlines och subtila skuggor.
+- Tailwind CSS för layout/typografi, shadcn-komponenter för formulär.
+- Responsivitet och tillgänglighet bevarad även utan inloggning.
 
 ## Tester
-- Playwright finns installerat (lägg egna tester i `tests/`).
-
-## Design
-- Varumärke: **Säljstöd NA**.
-- Primär färg: **#0033A1** (hover/nyanser i Tailwind-konfig).
-- Typografi: **Inter** via `next/font`.
-- Stil: premium/minimalistisk, hairlines + mjuka skuggor, subtila mikrointeraktioner.
-
----
-
-> Tips: Om du stöter på 401/permission-problem – verifiera att policies är körda och att `profiles`-rader finns för respektive `auth.users`-id.
+- Playwright är installerat; lägg egna tester i `tests/` vid behov.
