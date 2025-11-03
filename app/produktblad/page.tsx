@@ -162,6 +162,10 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
       reader.readAsDataURL(blob);
     });
 
+
+
+
+
   const tryDirectFetch = async () => {
     try {
       const response = await fetch(src);
@@ -412,6 +416,15 @@ export default function ProduktbladPage() {
     reader.readAsDataURL(file);
   };
 
+  function hexToRgb(hex: string): [number, number, number] {
+  const m = hex.trim().replace('#', '');
+  const full = m.length === 3 ? m.split('').map(c => c + c).join('') : m;
+  const num = parseInt(full, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+const brandBlue = hexToRgb("#023562");
+
+
   const handleGeneratePdf = async () => {
     setPdfState({ status: "loading", message: "Genererar PDF..." });
     try {
@@ -461,8 +474,10 @@ export default function ProduktbladPage() {
         }
       }
 
-      doc.setFillColor(15, 23, 42);
-      doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
+      const [rb, gb, bb] = brandBlue;
+doc.setFillColor(rb, gb, bb);
+doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
+
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
@@ -693,7 +708,7 @@ export default function ProduktbladPage() {
             lineWidth: 0.1,
           },
           headStyles: {
-            fillColor: [15, 23, 42],
+            fillColor: [rb, gb, bb],
             textColor: [255, 255, 255],
             font: baseFont,
             fontStyle: boldStyle,
