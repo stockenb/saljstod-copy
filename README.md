@@ -37,6 +37,36 @@ Ett minimalistiskt, premium internt säljverktyg byggt med **Next.js 14 (App Rou
 
    Kommandot ovan startar utvecklingsservern för huvudappen på port **3000**.
 
+## Auth flow & ENV
+
+### Obligatoriska miljövariabler
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL` (valfri, annars används värdet från `NEXT_PUBLIC_SUPABASE_URL` på serversidan)
+- `SUPABASE_ANON_KEY` (valfri, annars används `NEXT_PUBLIC_SUPABASE_ANON_KEY` på serversidan)
+
+Vid build/start kastar appen fel om `NEXT_PUBLIC_SUPABASE_URL` eller `NEXT_PUBLIC_SUPABASE_ANON_KEY` saknas.
+
+### Supabase → Auth → URL Configuration
+- **Site URL**: `https://saljstod.vercel.app`
+- **Additional Redirect URLs**: `https://saljstod-f4ou02w1x-stockenbs-projects.vercel.app`, `http://localhost:3000`
+- Magic links pekar mot `https://…/auth/callback` (authorization code flow).
+
+### Login-flödet
+1. `/login` skickar `signInWithOtp` med `emailRedirectTo = {origin}/auth/callback?next=…`.
+2. `/auth/callback` byter Supabase-koden mot session, sätter cookies och redirectar vidare.
+3. Middleware skyddar sidor i `PROTECTED` och redirectar oinloggade till `/login?next=/sidan`.
+4. Gamla hash-baserade länkar (`#access_token=`) fångas på `/login` och uppmanar användaren att begära ny länk.
+
+`next`-parametern måste börja på `/`. Annars faller redirecten tillbaka till `/`.
+
+### Testa lokalt
+1. Lägg envs i `./.env.local` (laddas av Next).
+2. Starta `npm run dev`.
+3. Öppna `http://localhost:3000/login?next=/` och begär en länk.
+4. Följ länken → du landar på `/auth/callback?code=…&next=/` → redirect till `/` med Supabase-cookies satta.
+5. Kontrollera i DevTools → Application → Cookies att Supabase-cookies finns på `localhost`.
+
 ### Skicka invites / magiska länkar (rekommenderat)
 Scriptet skapar användarna och sätter deras roll i `profiles`:
 ```bash
