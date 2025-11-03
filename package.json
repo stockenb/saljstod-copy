@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "node ./scripts/dev.mjs",
-    "dev:main": "next dev",
-    "build": "__NEXT_MANUAL_TYPESCRIPT_SETUP=1 next build",
-    "start": "next start",
-    "lint": "next lint",
+    "dev:main": "node ./scripts/run-next.mjs dev",
+    "build": "node ./scripts/run-next.mjs build",
+    "start": "node ./scripts/run-next.mjs start",
+    "lint": "node ./scripts/run-next.mjs lint",
     "test:e2e": "playwright test",
     "invite:users": "node ./scripts/invite-users.mjs"
   },
@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.48.2",
+    "@types/node": "24.5.2",
     "autoprefixer": "10.4.20",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.5",
