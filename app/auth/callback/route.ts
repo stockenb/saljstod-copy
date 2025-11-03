@@ -1,6 +1,7 @@
 // app/auth/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/env";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -24,26 +25,39 @@ export async function GET(request: NextRequest) {
   }
 
   // Skapa en server-klient med cookie-adapter som skriver cookies på vårt Response-objekt
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) => {
-          // Vi sätter cookien på *alla* potentiella svar, så vilket vi än returnerar har rätt cookies
-          redirectOnError.cookies.set({ name, value, ...options });
-          redirectOnUnauthorized.cookies.set({ name, value, ...options });
-          redirectOnSuccess.cookies.set({ name, value, ...options });
-        },
-        remove: (name: string, options: CookieOptions) => {
-          redirectOnError.cookies.set({ name, value: "", ...options, expires: new Date(0) });
-          redirectOnUnauthorized.cookies.set({ name, value: "", ...options, expires: new Date(0) });
-          redirectOnSuccess.cookies.set({ name, value: "", ...options, expires: new Date(0) });
-        },
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      get: (name: string) => request.cookies.get(name)?.value,
+      set: (name: string, value: string, options?: CookieOptions) => {
+        const cookieOptions = options ?? {};
+        // Vi sätter cookien på *alla* potentiella svar, så vilket vi än returnerar har rätt cookies
+        redirectOnError.cookies.set({ name, value, ...cookieOptions });
+        redirectOnUnauthorized.cookies.set({ name, value, ...cookieOptions });
+        redirectOnSuccess.cookies.set({ name, value, ...cookieOptions });
       },
-    }
-  );
+      remove: (name: string, options?: CookieOptions) => {
+        const cookieOptions = options ?? {};
+        redirectOnError.cookies.set({
+          name,
+          value: "",
+          ...cookieOptions,
+          expires: new Date(0),
+        });
+        redirectOnUnauthorized.cookies.set({
+          name,
+          value: "",
+          ...cookieOptions,
+          expires: new Date(0),
+        });
+        redirectOnSuccess.cookies.set({
+          name,
+          value: "",
+          ...cookieOptions,
+          expires: new Date(0),
+        });
+      },
+    },
+  });
 
   // Byt in koden mot en session (sätter cookies via adapter ovan)
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
