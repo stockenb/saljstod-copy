@@ -7,82 +7,88 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const origin = url.origin;
 
-  // Läs in parametrar
-  const code = url.searchParams.get("code");
-  const next =
-    url.searchParams.get("redirect") ||
-    url.searchParams.get("next") ||
-    url.searchParams.get("redirect_to") ||
-    "/";
+  // Hjälpare: skicka tillbaka till /login med diagnos i query
+  const fail = (reason: string, detail?: string) => {
+    const out = new URL(`${origin}/login`);
+    out.searchParams.set("error", "invalid_link");
+    out.searchParams.set("reason", reason);
+    if (detail) out.searchParams.set("detail", detail.slice(0, 200));
+    return NextResponse.redirect(out);
+  };
 
-  // Förbered ett svar-objekt direkt, så att Supabase kan sätta cookies på det
-  const redirectOnError = NextResponse.redirect(`${origin}/login?error=invalid_link`);
-  const redirectOnUnauthorized = NextResponse.redirect(`${origin}/login?error=unauthorized`);
-  const redirectOnSuccess = NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
+  try {
+    const code = url.searchParams.get("code");
+    const next =
+      url.searchParams.get("redirect") ||
+      url.searchParams.get("next") ||
+      url.searchParams.get("redirect_to") ||
+      "/";
 
-  if (!code) {
-    return redirectOnError;
-  }
+    if (!code) {
+      console.error("[auth/callback] missing ?code param. Full URL:", request.url);
+      return fail("missing_code_param");
+    }
 
-  // Skapa en server-klient med cookie-adapter som skriver cookies på vårt Response-objekt
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    cookies: {
-      get: (name: string) => request.cookies.get(name)?.value,
-      set: (name: string, value: string, options?: CookieOptions) => {
-        const cookieOptions = options ?? {};
-        // Vi sätter cookien på *alla* potentiella svar, så vilket vi än returnerar har rätt cookies
-        redirectOnError.cookies.set({ name, value, ...cookieOptions });
-        redirectOnUnauthorized.cookies.set({ name, value, ...cookieOptions });
-        redirectOnSuccess.cookies.set({ name, value, ...cookieOptions });
+    // Förbered tre svar där vi kan skriva cookies (oavsett utfall)
+    const redirectOnSuccess = NextResponse.redirect(
+      `${origin}${next.startsWith("/") ? next : "/"}`
+    );
+    const redirectOnUnauthorized = NextResponse.redirect(`${origin}/login?error=unauthorized`);
+
+    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      cookies: {
+        get: (name: string) => request.cookies.get(name)?.value,
+        set: (name: string, value: string, options?: CookieOptions) => {
+          const opt = options ?? {};
+          redirectOnSuccess.cookies.set({ name, value, ...opt });
+          redirectOnUnauthorized.cookies.set({ name, value, ...opt });
+        },
+        remove: (name: string, options?: CookieOptions) => {
+          const opt = options ?? {};
+          redirectOnSuccess.cookies.set({ name, value: "", ...opt, expires: new Date(0) });
+          redirectOnUnauthorized.cookies.set({ name, value: "", ...opt, expires: new Date(0) });
+        },
       },
-      remove: (name: string, options?: CookieOptions) => {
-        const cookieOptions = options ?? {};
-        redirectOnError.cookies.set({
-          name,
-          value: "",
-          ...cookieOptions,
-          expires: new Date(0),
-        });
-        redirectOnUnauthorized.cookies.set({
-          name,
-          value: "",
-          ...cookieOptions,
-          expires: new Date(0),
-        });
-        redirectOnSuccess.cookies.set({
-          name,
-          value: "",
-          ...cookieOptions,
-          expires: new Date(0),
-        });
-      },
-    },
-  });
+    });
 
-  // Byt in koden mot en session (sätter cookies via adapter ovan)
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-  if (exchangeError) {
-    return redirectOnError;
+    // Byt auth-koden mot session-cookies
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) {
+      console.error("[auth/callback] exchange error:", exchangeError);
+      return fail("exchange_error", exchangeError.message);
+    }
+
+    // Verifiera att vi har användare
+    const {
+      data: { user },
+      error: getUserErr,
+    } = await supabase.auth.getUser();
+
+    if (getUserErr || !user) {
+      console.error("[auth/callback] getUser error:", getUserErr);
+      return fail("no_user");
+    }
+
+    // Behörighetskontroll mot profiles
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("[auth/callback] profile query error:", profileError);
+    }
+
+    if (!profile || profileError) {
+      await supabase.auth.signOut();
+      return redirectOnUnauthorized;
+    }
+
+    // OK → vidare
+    return redirectOnSuccess;
+  } catch (e: any) {
+    console.error("[auth/callback] unexpected error:", e);
+    return fail("unexpected", e?.message ?? "unknown");
   }
-
-  // Verifiera att vi har en user
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !user) {
-    return redirectOnError;
-  }
-
-  // Behörighetskontroll mot profiles
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile || profileError) {
-    await supabase.auth.signOut();
-    return redirectOnUnauthorized;
-  }
-
-  // Allt OK → skicka vidare
-  return redirectOnSuccess;
 }
