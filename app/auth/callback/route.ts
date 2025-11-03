@@ -1,30 +1,63 @@
-import { NextResponse } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase/serverClient";
+// app/auth/callback/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const origin = url.origin;
+
+  // Läs in parametrar
+  const code = url.searchParams.get("code");
+  const next =
+    url.searchParams.get("redirect") ||
+    url.searchParams.get("next") ||
+    url.searchParams.get("redirect_to") ||
+    "/";
+
+  // Förbered ett svar-objekt direkt, så att Supabase kan sätta cookies på det
+  const redirectOnError = NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  const redirectOnUnauthorized = NextResponse.redirect(`${origin}/login?error=unauthorized`);
+  const redirectOnSuccess = NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+    return redirectOnError;
   }
 
-  const supabase = getSupabaseServer();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  // Skapa en server-klient med cookie-adapter som skriver cookies på vårt Response-objekt
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => request.cookies.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) => {
+          // Vi sätter cookien på *alla* potentiella svar, så vilket vi än returnerar har rätt cookies
+          redirectOnError.cookies.set({ name, value, ...options });
+          redirectOnUnauthorized.cookies.set({ name, value, ...options });
+          redirectOnSuccess.cookies.set({ name, value, ...options });
+        },
+        remove: (name: string, options: CookieOptions) => {
+          redirectOnError.cookies.set({ name, value: "", ...options, expires: new Date(0) });
+          redirectOnUnauthorized.cookies.set({ name, value: "", ...options, expires: new Date(0) });
+          redirectOnSuccess.cookies.set({ name, value: "", ...options, expires: new Date(0) });
+        },
+      },
+    }
+  );
 
-  if (error) {
-    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  // Byt in koden mot en session (sätter cookies via adapter ovan)
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  if (exchangeError) {
+    return redirectOnError;
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.redirect(`${origin}/login?error=invalid_link`);
+  // Verifiera att vi har en user
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) {
+    return redirectOnError;
   }
 
+  // Behörighetskontroll mot profiles
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
@@ -33,8 +66,9 @@ export async function GET(request: Request) {
 
   if (!profile || profileError) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(`${origin}/login?error=unauthorized`);
+    return redirectOnUnauthorized;
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Allt OK → skicka vidare
+  return redirectOnSuccess;
 }
