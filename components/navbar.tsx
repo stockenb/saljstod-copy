@@ -48,7 +48,7 @@ export function Navbar() {
           />
           <span className="sr-only">Säljstöd</span>
         </Link>
-        <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
+      {/* <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
           {nav.map((n) => {
             const isActive = pathname === n.href;
             return (
@@ -66,7 +66,7 @@ export function Navbar() {
               </Link>
             );
           })}
-        </nav>
+        </nav>*/}
         <div className="text-xs font-medium uppercase tracking-[0.3em] text-neutral-400">
           2025
         </div>

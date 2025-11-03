@@ -16,20 +16,20 @@ const primaryCards: Card[] = [
     emoji: "🏡",
   },
   {
-    href: "https://karta.nilsahlgren.se",
-    title: "Industristängsel",
+    href: "https://industristangsel.vercel.app/",
+    title: "Industristängsel - Under produktion",
     description: "Projektunderlag och översikter för industristängsel.",
     emoji: "🏭",
   },
   {
-    href: "https://karta.nilsahlgren.se",
-    title: "Panelstängsel",
+    href: "",
+    title: "Panelstängsel - Kommer snart",
     description: "Samlad information om panelstängselprojekt.",
-    emoji: "⛓️",
+    emoji: "𝄜",
   },
   {
-    href: "https://karta.nilsahlgren.se",
-    title: "Viltstängsel",
+    href: "",
+    title: "Viltstängsel - Kommer snart",
     description: "Resurser och verktyg för viltstängsel.",
     emoji: "🦌",
   },
@@ -37,7 +37,7 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
-    href: "https://karta.nilsahlgren.se",
+    href: "https://ean-zeta.vercel.app/",
     title: "EAN",
     description: "Snabb åtkomst till EAN-uppslag.",
     emoji: "🏷️",
@@ -68,8 +68,6 @@ function CardLink({ card }: { card: Card }) {
     <Link
       key={`${card.title}-${card.href}`}
       href={card.href}
-      target="_blank"
-      rel="noreferrer"
       className={`${baseClasses} ${padding}`}
     >
       <div className={isCompact ? "text-3xl" : "text-4xl"} aria-hidden>
