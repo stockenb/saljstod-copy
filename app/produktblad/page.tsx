@@ -72,27 +72,24 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
     return null;
   }
 
-  if (source.startsWith("data:image/")) {
-    const formatMatch = source.match(/^data:image\/(png|jpe?g|webp)/i);
+  const parseDataUrl = (dataUrl: string): PdfImage | null => {
+    const formatMatch = dataUrl.match(/^data:image\/(png|jpe?g|webp)/i);
     const format = (formatMatch?.[1] ?? "png").toLowerCase();
     if (format === "jpg" || format === "jpeg") {
-      return { dataUrl: source, format: "JPEG" };
+      return { dataUrl, format: "JPEG" };
     }
     if (format === "webp") {
-      return { dataUrl: source, format: "WEBP" };
+      return { dataUrl, format: "WEBP" };
     }
-    return { dataUrl: source, format: "PNG" };
+    return { dataUrl, format: "PNG" };
+  };
+
+  if (source.startsWith("data:image/")) {
+    return parseDataUrl(source);
   }
 
-  try {
-    const response = await fetch(source);
-    if (!response.ok) {
-      return null;
-    }
-
-    const blob = await response.blob();
-
-    return await new Promise<PdfImage | null>((resolve, reject) => {
+  const blobToPdfImage = async (blob: Blob) =>
+    new Promise<PdfImage | null>((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result;
@@ -101,25 +98,56 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
           return;
         }
 
-        const formatMatch = result.match(/^data:image\/(png|jpe?g|webp)/i);
-        const format = (formatMatch?.[1] ?? "png").toLowerCase();
-        if (format === "jpg" || format === "jpeg") {
-          resolve({ dataUrl: result, format: "JPEG" });
-          return;
-        }
-        if (format === "webp") {
-          resolve({ dataUrl: result, format: "WEBP" });
-          return;
-        }
-        resolve({ dataUrl: result, format: "PNG" });
+        resolve(parseDataUrl(result));
       };
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-  } catch (error) {
-    console.error("Kunde inte läsa in bilden", error);
-    return null;
+
+  const tryDirectFetch = async () => {
+    try {
+      const response = await fetch(source);
+      if (!response.ok) {
+        return null;
+      }
+
+      const blob = await response.blob();
+      return await blobToPdfImage(blob);
+    } catch (error) {
+      console.warn("Kunde inte läsa in bilden direkt", error);
+      return null;
+    }
+  };
+
+  const tryProxyFetch = async () => {
+    try {
+      const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(source)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json().catch(() => null)) as
+        | { dataUrl?: string }
+        | null;
+
+      if (!data?.dataUrl) {
+        return null;
+      }
+
+      return parseDataUrl(data.dataUrl);
+    } catch (error) {
+      console.error("Kunde inte proxy-ladda bilden", error);
+      return null;
+    }
+  };
+
+  const directImage = await tryDirectFetch();
+  if (directImage) {
+    return directImage;
   }
+
+  return await tryProxyFetch();
 }
 
 let logoCache: PdfImage | null | undefined;
@@ -347,7 +375,7 @@ export default function ProduktbladPage() {
       const baseFont = fontsLoaded ? "Poppins" : "helvetica";
       const boldStyle = "bold";
       const normalStyle = "normal";
-      const accentColor: [number, number, number] = [37, 99, 235];
+      const accentColor: [number, number, number] = [255, 83, 10];
       const headingColor: [number, number, number] = [30, 41, 59];
       const textColor: [number, number, number] = [51, 65, 85];
 
