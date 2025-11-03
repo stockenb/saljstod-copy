@@ -67,6 +67,8 @@ const contactDetails = [
   "info@nilsahlgren.se • +46 8 500 125 80 • www.nilsahlgren.se",
 ];
 
+const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
+
 async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
   if (!source) {
     return null;
