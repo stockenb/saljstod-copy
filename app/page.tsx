@@ -50,6 +50,13 @@ const secondaryCards: Card[] = [
     emoji: "📝",
     variant: "compact" as const,
   },
+  {
+    href: "/produktblad/samlat",
+    title: "Skapa samlat produktblad",
+    description: "Skapa ett produktblad med flera artiklar.",
+    emoji: "🧰",
+    variant: "compact" as const,
+  },
 ];
 
 function CardLink({ card }: { card: Card }) {
