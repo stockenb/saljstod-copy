@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +36,223 @@ const contactDetails = [
   "info@nilsahlgren.se • +46 8 500 125 80 • www.nilsahlgren.se",
 ];
 
-const MAX_DESCRIPTION_LINES = 8;
+type PdfImage = {
+  dataUrl: string;
+  format: "PNG" | "JPEG" | "WEBP";
+};
+
+const LOGO_IMAGE_PATH = "/na_foretag.png";
+
+const POPPINS_FONT_URLS = {
+  regular: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.ttf",
+  semiBold: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-600-normal.ttf",
+} as const;
+
+const POPPINS_FONT_FILES = {
+  regular: "Poppins-Regular.ttf",
+  semiBold: "Poppins-SemiBold.ttf",
+} as const;
+
+type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
+
+const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
+
+function normalizeUrl(raw: string): string {
+  if (!raw) return raw;
+  if (raw.startsWith("data:image/")) return raw;
+
+  try {
+    const [base, rest] = raw.split(/([?#].*)/);
+    return encodeURI(base) + (rest ?? "");
+  } catch {
+    return raw.replace(/ /g, "%20");
+  }
+}
+
+async function loadHtmlImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+async function rasterizeToJpeg(pdfImage: PdfImage, quality = 0.92) {
+  const img = await loadHtmlImageFromDataUrl(pdfImage.dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Kunde inte skapa 2D-kontext");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", quality);
+  return {
+    dataUrl,
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
+  if (!source) {
+    return null;
+  }
+
+  const src = normalizeUrl(source);
+
+  const parseDataUrl = (dataUrl: string): PdfImage | null => {
+    const formatMatch = dataUrl.match(/^data:image\/(png|jpe?g|webp)/i);
+    const format = (formatMatch?.[1] ?? "png").toLowerCase();
+    if (format === "jpg" || format === "jpeg") {
+      return { dataUrl, format: "JPEG" };
+    }
+    if (format === "webp") {
+      return { dataUrl, format: "WEBP" };
+    }
+    return { dataUrl, format: "PNG" };
+  };
+
+  if (src.startsWith("data:image/")) {
+    return parseDataUrl(src);
+  }
+
+  const blobToPdfImage = async (blob: Blob) =>
+    new Promise<PdfImage | null>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          resolve(null);
+          return;
+        }
+        resolve(parseDataUrl(result));
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+
+  const tryDirectFetch = async () => {
+    try {
+      const response = await fetch(src);
+      if (!response.ok) {
+        return null;
+      }
+      const blob = await response.blob();
+      return await blobToPdfImage(blob);
+    } catch (error) {
+      console.warn("Kunde inte läsa in bilden direkt", error);
+      return null;
+    }
+  };
+
+  const tryProxyFetch = async () => {
+    try {
+      const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(src)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json().catch(() => null)) as { dataUrl?: string } | null;
+      if (!data?.dataUrl) {
+        return null;
+      }
+
+      return parseDataUrl(data.dataUrl);
+    } catch (error) {
+      console.error("Kunde inte proxy-ladda bilden", error);
+      return null;
+    }
+  };
+
+  const directImage = await tryDirectFetch();
+  if (directImage) {
+    return directImage;
+  }
+
+  return await tryProxyFetch();
+}
+
+let logoCache: PdfImage | null | undefined;
+
+async function loadLogoImage() {
+  if (typeof logoCache !== "undefined") {
+    return logoCache;
+  }
+
+  logoCache = await convertImageToDataUrl(LOGO_IMAGE_PATH);
+  return logoCache;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return typeof window === "undefined" ? "" : window.btoa(binary);
+}
+
+async function loadFontBase64(variant: PoppinsFontVariant) {
+  if (poppinsFontCache[variant]) {
+    return poppinsFontCache[variant] as string;
+  }
+
+  const response = await fetch(POPPINS_FONT_URLS[variant]);
+  if (!response.ok) {
+    throw new Error(`Kunde inte ladda fonten ${variant}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  const base64 = arrayBufferToBase64(buffer);
+  if (!base64) {
+    throw new Error("Kunde inte konvertera fonten till base64");
+  }
+  poppinsFontCache[variant] = base64;
+  return base64;
+}
+
+async function ensurePoppinsFonts(doc: jsPDF) {
+  try {
+    const [regular, semiBold] = await Promise.all([loadFontBase64("regular"), loadFontBase64("semiBold")]);
+
+    doc.addFileToVFS(POPPINS_FONT_FILES.regular, regular);
+    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal");
+    doc.addFileToVFS(POPPINS_FONT_FILES.semiBold, semiBold);
+    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold");
+
+    return true;
+  } catch (error) {
+    console.warn("Kunde inte ladda Poppins", error);
+    return false;
+  }
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const sanitized = hex.trim().replace("#", "");
+  const full = sanitized.length === 3 ? sanitized.split("").map((char) => char + char).join("") : sanitized;
+  const num = parseInt(full, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function createFilename(products: ProductData[]) {
+  const first = products[0];
+  const base = first?.title || first?.articleNumber || "samlat-produktblad";
+  return `${base}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .concat("-samlat.pdf");
+}
 
 function normalizeArticleNumbers(raw: string): string[] {
   return raw
@@ -157,115 +374,340 @@ export default function CombinedProductSheetPage() {
     setPdfState({ status: "loading", message: "Genererar PDF..." });
 
     try {
-      const { jsPDF } = await import("jspdf");
+      const [{ jsPDF }, autoTableModule, logoImage] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+        loadLogoImage(),
+      ]);
+      const autoTable = autoTableModule.default;
+
       const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const fontsLoaded = await ensurePoppinsFonts(doc);
+      const baseFont = fontsLoaded ? "Poppins" : "helvetica";
+      const boldStyle = "bold";
+      const normalStyle = "normal";
+      const headingColor: [number, number, number] = [30, 41, 59];
+      const textColor: [number, number, number] = [51, 65, 85];
+      const brandBlue = hexToRgb("#023562");
+
+      const firstProduct = products[0];
+      const sharedDescription = firstProduct?.description ?? "";
+      const sharedImage = firstProduct?.image ?? "";
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const marginX = 20;
-      const marginY = 20;
       const contentWidth = pageWidth - marginX * 2;
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(20);
-      doc.setTextColor(30, 41, 59);
-      doc.text("Samlat produktblad", marginX, marginY);
+      const logoTop = 6;
+      let headerTop = 18;
 
-      let currentY = marginY + 10;
+      if (logoImage) {
+        try {
+          const logoProps = doc.getImageProperties(logoImage.dataUrl);
+          const maxLogoWidth = 60;
+          let logoWidth = maxLogoWidth;
+          let logoHeight = (logoProps.height / logoProps.width) * logoWidth;
 
-      products.forEach((product, index) => {
-        if (currentY > pageHeight - marginY - 40) {
-          doc.addPage();
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(20);
-          doc.setTextColor(30, 41, 59);
-          doc.text("Samlat produktblad", marginX, marginY);
-          currentY = marginY + 10;
+          if (logoHeight > 12) {
+            logoHeight = 12;
+            logoWidth = (logoProps.width / logoProps.height) * logoHeight;
+          }
+
+          const logoX = marginX;
+          const logoY = logoTop;
+          doc.addImage(logoImage.dataUrl, logoImage.format, logoX, logoY, logoWidth, logoHeight);
+
+          headerTop = Math.max(headerTop, logoY + logoHeight + 6);
+        } catch (logoError) {
+          console.warn("Kunde inte lägga till logotyp i PDF", logoError);
         }
+      }
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text(product.title || "Produkt", marginX, currentY);
+      const [rb, gb, bb] = brandBlue;
+      doc.setFillColor(rb, gb, bb);
+      doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
+
+      doc.setFont(baseFont, boldStyle);
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.text(firstProduct?.title || "Samlat produktblad", marginX + 8, headerTop + 12);
+
+      doc.setFont(baseFont, normalStyle);
+      doc.setFontSize(11);
+      doc.setTextColor(226, 232, 240);
+      doc.text("Samlat produktblad", marginX + 8, headerTop + 20);
+
+      let currentY = headerTop + 34;
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+
+      const articleNumbers = products.map((product) => product.articleNumber).filter(Boolean);
+      if (articleNumbers.length > 0) {
+        doc.setFont(baseFont, boldStyle);
+        doc.setFontSize(13);
+        doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
+        doc.text("Artiklar i produktfamiljen", marginX, currentY);
         currentY += 6;
 
-        doc.setFont("helvetica", "normal");
+        doc.setFont(baseFont, normalStyle);
+        doc.setFontSize(10.5);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        const articleLines = doc.splitTextToSize(articleNumbers.join(", "), contentWidth);
+        const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
+        doc.text(articleLines, marginX, currentY);
+        currentY += articleLines.length * lineHeight + 6;
+      }
+
+      const image = await convertImageToDataUrl(sharedImage);
+      const columnGap = 12;
+      let columnWidth = contentWidth;
+      let columnLimitY = currentY;
+      let descriptionStartY = currentY;
+      let imageLayout: { x: number; y: number; width: number; height: number; bottom: number } | null = null;
+
+      if (image) {
+        try {
+          const raster = await rasterizeToJpeg(image);
+
+          const maxImageWidth = 70;
+          const maxImageHeight = 70;
+          let imageWidth = maxImageWidth;
+          let imageHeight = (raster.height / raster.width) * imageWidth;
+
+          if (imageHeight > maxImageHeight) {
+            imageHeight = maxImageHeight;
+            imageWidth = (raster.width / raster.height) * imageHeight;
+          }
+
+          const imageX = marginX + contentWidth - imageWidth;
+          const imageY = currentY;
+          doc.setDrawColor(226, 232, 240);
+          doc.roundedRect(imageX - 1, imageY - 1, imageWidth + 2, imageHeight + 2, 3, 3);
+          doc.addImage(raster.dataUrl, "JPEG", imageX, imageY, imageWidth, imageHeight);
+
+          imageLayout = {
+            x: imageX,
+            y: imageY,
+            width: imageWidth,
+            height: imageHeight,
+            bottom: imageY + imageHeight,
+          };
+
+          columnWidth = Math.max(imageX - marginX - columnGap, 40);
+          columnLimitY = imageLayout.bottom + 6;
+        } catch (imageError) {
+          console.warn("Kunde inte lägga till bild i PDF", imageError);
+        }
+      }
+
+      if (!imageLayout) {
+        descriptionStartY = currentY;
+      }
+
+      let descriptionBottom = Math.max(descriptionStartY, columnLimitY);
+
+      if (sharedDescription) {
+        doc.setFont(baseFont, boldStyle);
+        doc.setFontSize(13);
+        doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
+        doc.text("Produktbeskrivning", marginX, currentY);
+
+        let textBaseline = currentY + 8;
+        doc.setFont(baseFont, normalStyle);
         doc.setFontSize(11);
-        const articleLine = [`Artikelnummer: ${product.articleNumber}`];
-        if (product.weight) {
-          articleLine.push(`Vikt: ${product.weight}`);
-        }
-        doc.text(articleLine.join("  •  "), marginX, currentY);
-        currentY += 6;
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
+        let lastLineBaseline: number | null = null;
 
-        if (product.description) {
-          doc.setFontSize(10);
-          const descriptionLines = doc.splitTextToSize(product.description, contentWidth);
-          const limitedDescription = descriptionLines.slice(0, MAX_DESCRIPTION_LINES);
-          doc.text(limitedDescription, marginX, currentY);
-          currentY += limitedDescription.length * 5 + 2;
-        }
+        const paragraphs = sharedDescription.split(/\r?\n\s*\r?\n/);
 
-        if (product.specs.length > 0) {
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(11);
-          doc.text("Specifikationer", marginX, currentY);
-          currentY += 5;
+        for (const [index, paragraph] of paragraphs.entries()) {
+          const normalizedParagraph = paragraph.replace(/\r?\n/g, " ").trim();
 
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(10);
+          if (index > 0) {
+            textBaseline += lineHeight;
+          }
 
-          product.specs.slice(0, 10).forEach((spec) => {
-            if (currentY > pageHeight - marginY - 30) {
-              doc.addPage();
-              doc.setFont("helvetica", "bold");
-              doc.setFontSize(20);
-              doc.setTextColor(30, 41, 59);
-              doc.text("Samlat produktblad", marginX, marginY);
-              currentY = marginY + 10;
+          if (!normalizedParagraph) {
+            continue;
+          }
 
-              doc.setFontSize(14);
-              doc.text(product.title || "Produkt", marginX, currentY);
-              currentY += 6;
+          const words = normalizedParagraph.split(/\s+/);
+          let currentLine = "";
 
-              doc.setFont("helvetica", "normal");
-              doc.setFontSize(11);
-              doc.text(articleLine.join("  •  "), marginX, currentY);
-              currentY += 6;
-
-              doc.setFont("helvetica", "bold");
-              doc.setFontSize(11);
-              doc.text("Specifikationer", marginX, currentY);
-              currentY += 5;
-              doc.setFont("helvetica", "normal");
-              doc.setFontSize(10);
+          const writeLine = (line: string) => {
+            if (!line) {
+              return;
             }
 
-            const line = `${spec.key}: ${spec.value}`;
-            const specLines = doc.splitTextToSize(line, contentWidth - 6);
-            doc.text(specLines, marginX + 3, currentY);
-            currentY += specLines.length * 4;
-          });
+            const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const lineWidth = doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+            if (lineWidth > maxWidth) {
+              const forcedLines = doc.splitTextToSize(line, maxWidth);
+              for (const forcedLine of forcedLines) {
+                doc.text(forcedLine, marginX, textBaseline);
+                lastLineBaseline = textBaseline;
+                textBaseline += lineHeight;
+              }
+            } else {
+              doc.text(line, marginX, textBaseline);
+              lastLineBaseline = textBaseline;
+              textBaseline += lineHeight;
+            }
+          };
+
+          for (const word of words) {
+            const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+            const candidate = currentLine ? `${currentLine} ${word}` : word;
+            const candidateWidth =
+              doc.getStringUnitWidth(candidate) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+            if (candidateWidth <= maxWidth) {
+              currentLine = candidate;
+            } else {
+              writeLine(currentLine);
+              currentLine = "";
+
+              const updatedMaxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
+              const wordWidth = doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
+
+              if (wordWidth > updatedMaxWidth) {
+                const forcedLines = doc.splitTextToSize(word, updatedMaxWidth);
+                for (const forcedLine of forcedLines) {
+                  doc.text(forcedLine, marginX, textBaseline);
+                  lastLineBaseline = textBaseline;
+                  textBaseline += lineHeight;
+                }
+              } else {
+                currentLine = word;
+              }
+            }
+          }
+
+          if (currentLine) {
+            writeLine(currentLine);
+          }
         }
 
-        if (index < products.length - 1) {
-          currentY += 4;
-          doc.setDrawColor(226, 232, 240);
-          doc.line(marginX, currentY, marginX + contentWidth, currentY);
-          currentY += 6;
+        if (lastLineBaseline) {
+          descriptionBottom = Math.max(columnLimitY, lastLineBaseline + 6);
+        } else {
+          descriptionBottom = Math.max(columnLimitY, textBaseline + 6);
         }
+      }
+
+      const layoutBottom = Math.max(columnLimitY, descriptionBottom);
+      currentY = layoutBottom + 12;
+
+      const columnCount = products.length;
+      const rowOrder: string[] = [];
+      const rowMap = new Map<string, string[]>();
+      const ensureRow = (label: string) => {
+        if (!rowMap.has(label)) {
+          rowMap.set(label, Array(columnCount).fill(""));
+          rowOrder.push(label);
+        }
+        return rowMap.get(label)!;
+      };
+
+      // Artikeltitlar
+      const titleRow = ensureRow("Benämning");
+      products.forEach((product, index) => {
+        titleRow[index] = product.title || "-";
       });
 
-      const lastPage = doc.getNumberOfPages();
-      doc.setPage(lastPage);
-      const footerY = doc.internal.pageSize.getHeight() - marginY + 6;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      // Vikt
+      const weightRow = ensureRow("Vikt");
+      products.forEach((product, index) => {
+        weightRow[index] = product.weight || "-";
+      });
+
+      // Specifikationer
+      products.forEach((product, productIndex) => {
+        product.specs.forEach((spec) => {
+          const label = spec.key.trim() || "Specifikation";
+          const row = ensureRow(label);
+          row[productIndex] = spec.value.trim() || "-";
+        });
+      });
+
+      const tableBody = rowOrder
+        .map((label) => {
+          const values = rowMap.get(label) ?? [];
+          return [label, ...values.map((value) => value || "-")];
+        })
+        .filter((row) => row.slice(1).some((value) => value && value !== "-"));
+
+      if (tableBody.length > 0) {
+        const headRow = ["Specifikation", ...products.map((product) => product.articleNumber || "-")];
+
+        if (currentY + 40 > pageHeight - 30) {
+          doc.addPage();
+          currentY = 30;
+        }
+
+        doc.setFont(baseFont, boldStyle);
+        doc.setFontSize(13);
+        doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
+        doc.text("Översikt", marginX, currentY);
+        currentY += 6;
+
+        autoTable(doc, {
+          startY: currentY,
+          margin: { left: marginX, right: marginX },
+          head: [headRow],
+          body: tableBody,
+          styles: {
+            font: baseFont,
+            fontStyle: normalStyle,
+            fontSize: 10,
+            textColor,
+            cellPadding: 3,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.1,
+          },
+          headStyles: {
+            fillColor: [rb, gb, bb],
+            textColor: [255, 255, 255],
+            font: baseFont,
+            fontStyle: boldStyle,
+            fontSize: 11,
+            halign: "left",
+          },
+          columnStyles: {
+            0: { fontStyle: boldStyle },
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          tableLineColor: [226, 232, 240],
+          tableLineWidth: 0.1,
+        });
+
+        const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+        if (finalY) {
+          currentY = finalY + 10;
+        }
+      }
+
+      if (currentY > pageHeight - 30) {
+        doc.addPage();
+        currentY = 30;
+      }
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(marginX, pageHeight - 26, pageWidth - marginX, pageHeight - 26);
+
+      doc.setFont(baseFont, normalStyle);
+      doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
+      const footerY = pageHeight - 16;
       contactDetails.forEach((line, index) => {
-        doc.text(line, marginX, footerY + index * 4);
+        doc.text(line, marginX, footerY + index * 5);
       });
 
-      doc.save("samlat-produktblad.pdf");
+      doc.save(createFilename(products));
       setPdfState({ status: "success", message: "PDF genererad." });
     } catch (error) {
       console.error(error);
