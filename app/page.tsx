@@ -136,7 +136,7 @@ function CardLink({ card }: { card: Card }) {
 
 export default function HomePage() {
   return (
-    <div className="relative isolate">
+    <div className="relative isolate -mx-6 -mt-10 pb-10 sm:-mx-8 lg:-mx-10">
       <div className="relative left-1/2 right-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-sky-100 py-12 sm:py-16 min-h-[calc(100vh-8rem)]">
         <div
           className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-sky-200/60 blur-3xl"
@@ -150,7 +150,7 @@ export default function HomePage() {
           className="pointer-events-none absolute inset-x-1/2 top-1/3 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-white/60 blur-3xl"
           aria-hidden
         />
-        <section className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-20 sm:px-12">
+        <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-20 sm:px-12">
           <div className="flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-8 shadow-[0_25px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
             <div>
               <span className="inline-flex items-center rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-sky-600 shadow-sm">
