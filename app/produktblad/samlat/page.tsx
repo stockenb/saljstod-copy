@@ -57,6 +57,70 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
+const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
+
+function normalizeSpecKey(label: string) {
+  return label.trim().toLowerCase();
+}
+
+function tokenizeTitle(title: string) {
+  return title
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function findCommonPrefixTokens(tokenLists: string[][]) {
+  if (tokenLists.length === 0) {
+    return [] as string[];
+  }
+
+  let prefix = [...tokenLists[0]];
+
+  for (let listIndex = 1; listIndex < tokenLists.length && prefix.length > 0; listIndex += 1) {
+    const tokens = tokenLists[listIndex];
+    const maxLength = Math.min(prefix.length, tokens.length);
+    let matchLength = 0;
+
+    while (
+      matchLength < maxLength &&
+      prefix[matchLength].toLowerCase() === tokens[matchLength]?.toLowerCase()
+    ) {
+      matchLength += 1;
+    }
+
+    prefix = prefix.slice(0, matchLength);
+  }
+
+  return prefix;
+}
+
+function findCommonSuffixTokens(tokenLists: string[][]) {
+  if (tokenLists.length === 0) {
+    return [] as string[];
+  }
+
+  let suffix = [...tokenLists[0]];
+
+  for (let listIndex = 1; listIndex < tokenLists.length && suffix.length > 0; listIndex += 1) {
+    const tokens = tokenLists[listIndex];
+    const maxLength = Math.min(suffix.length, tokens.length);
+    let matchLength = 0;
+
+    while (
+      matchLength < maxLength &&
+      suffix[suffix.length - 1 - matchLength]?.toLowerCase() ===
+        tokens[tokens.length - 1 - matchLength]?.toLowerCase()
+    ) {
+      matchLength += 1;
+    }
+
+    suffix = suffix.slice(suffix.length - matchLength);
+  }
+
+  return suffix;
+}
+
 function normalizeUrl(raw: string): string {
   if (!raw) return raw;
   if (raw.startsWith("data:image/")) return raw;
@@ -600,60 +664,84 @@ export default function CombinedProductSheetPage() {
       const layoutBottom = Math.max(columnLimitY, descriptionBottom);
       currentY = layoutBottom + 12;
 
-      const formatValue = (value?: string) => {
+      const displayValue = (value?: string) => {
         const trimmed = (value ?? "").trim();
         return trimmed || "-";
       };
 
-      const articleEntries = products.map((product) => {
-        const articleNumber = product.articleNumber || "-";
-        const values = new Map<string, string>();
-        values.set("Benämning", formatValue(product.title));
-        values.set("Vikt", formatValue(product.weight));
+      const specOrder: string[] = [];
+      const rawEntries = products.map((product) => {
+        const articleNumber = displayValue(product.articleNumber);
+        const originalTitle = (product.title ?? "").trim();
+        const tokens = tokenizeTitle(originalTitle);
+        const specMap = new Map<string, string>();
+
         product.specs.forEach((spec) => {
           const label = spec.key.trim() || "Specifikation";
-          values.set(label, formatValue(spec.value));
+          if (EXCLUDED_SPEC_KEYS.has(normalizeSpecKey(label))) {
+            return;
+          }
+
+          const trimmedValue = (spec.value ?? "").trim();
+          if (!specOrder.includes(label)) {
+            specOrder.push(label);
+          }
+          specMap.set(label, trimmedValue);
         });
-        return { articleNumber, values };
+
+        return { articleNumber, originalTitle, tokens, specMap };
       });
 
-      const specLabels: string[] = [];
-      const ensureSpecLabel = (label: string) => {
-        if (!specLabels.includes(label)) {
-          specLabels.push(label);
+      const tokenLists = rawEntries
+        .map((entry) => entry.tokens)
+        .filter((entryTokens) => entryTokens.length > 0);
+      const prefixTokens = findCommonPrefixTokens(tokenLists);
+      const suffixTokens = findCommonSuffixTokens(tokenLists);
+      const prefixLength = prefixTokens.length;
+      const suffixLength = suffixTokens.length;
+
+      const articleEntries = rawEntries.map((entry) => {
+        const { tokens } = entry;
+        let endIndex = tokens.length - suffixLength;
+        if (endIndex < prefixLength) {
+          endIndex = prefixLength;
         }
-      };
+        const sizeTokens = tokens.slice(prefixLength, endIndex);
+        const sizeText = sizeTokens.join(" ").trim();
 
-      ensureSpecLabel("Benämning");
-      ensureSpecLabel("Vikt");
+        return {
+          articleNumber: entry.articleNumber,
+          size: displayValue(sizeText || entry.originalTitle),
+          specMap: entry.specMap,
+        };
+      });
 
-      products.forEach((product) => {
-        product.specs.forEach((spec) => {
-          const label = spec.key.trim() || "Specifikation";
-          ensureSpecLabel(label);
+      const sharedSpecLabels = specOrder.filter((label) => {
+        const firstValue = (rawEntries[0]?.specMap.get(label) ?? "").trim();
+        if (!firstValue) {
+          return false;
+        }
+
+        return rawEntries.every((entry) => {
+          const value = (entry.specMap.get(label) ?? "").trim();
+          return value && value.toLowerCase() === firstValue.toLowerCase();
         });
       });
 
-      const filteredSpecLabels = specLabels.filter((label) => {
-        if (label === "Benämning" || label === "Vikt") {
-          return true;
-        }
-        return articleEntries.some((entry) => {
-          const value = entry.values.get(label);
-          return value && value !== "-";
-        });
-      });
+      const sharedSpecs = sharedSpecLabels.map((label) => ({
+        label,
+        value: displayValue(rawEntries[0]?.specMap.get(label)),
+      }));
 
-      if (filteredSpecLabels.length > 0) {
-        const maxColumnsPerTable = 5;
-        const specColumnsPerTable = Math.max(1, maxColumnsPerTable - 1);
-        const specGroups: string[][] = [];
+      const remainingSpecLabels = specOrder.filter(
+        (label) => !sharedSpecLabels.includes(label),
+      );
+      const filteredSpecLabels = remainingSpecLabels.filter((label) =>
+        rawEntries.some((entry) => (entry.specMap.get(label) ?? "").trim()),
+      );
 
-        for (let index = 0; index < filteredSpecLabels.length; index += specColumnsPerTable) {
-          specGroups.push(filteredSpecLabels.slice(index, index + specColumnsPerTable));
-        }
-
-        if (currentY + 40 > pageHeight - 30) {
+      if (sharedSpecs.length > 0) {
+        if (currentY + 30 > pageHeight - 30) {
           doc.addPage();
           currentY = 30;
         }
@@ -661,62 +749,103 @@ export default function CombinedProductSheetPage() {
         doc.setFont(baseFont, boldStyle);
         doc.setFontSize(13);
         doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
-        doc.text("Översikt", marginX, currentY);
+        doc.text("Specifikation", marginX, currentY);
         currentY += 6;
 
-        specGroups.forEach((group, groupIndex) => {
-          const headRow = ["Artikelnummer", ...group];
-          const tableBody = articleEntries.map((entry) => {
-            const rowValues = group.map((label) => entry.values.get(label) || "-");
-            return [entry.articleNumber, ...rowValues];
-          });
-
-          if (groupIndex > 0) {
-            currentY += 4;
-          }
-
-          if (currentY + 30 > pageHeight - 30) {
-            doc.addPage();
-            currentY = 30;
-          }
-
-          autoTable(doc, {
-            startY: currentY,
-            margin: { left: marginX, right: marginX },
-            head: [headRow],
-            body: tableBody,
-            styles: {
-              font: baseFont,
-              fontStyle: normalStyle,
-              fontSize: 10,
-              textColor,
-              cellPadding: 3,
-              lineColor: [226, 232, 240],
-              lineWidth: 0.1,
-            },
-            headStyles: {
-              fillColor: [rb, gb, bb],
-              textColor: [255, 255, 255],
-              font: baseFont,
-              fontStyle: boldStyle,
-              fontSize: 11,
-              halign: "left",
-            },
-            columnStyles: {
-              0: { fontStyle: boldStyle },
-            },
-            alternateRowStyles: {
-              fillColor: [248, 250, 252],
-            },
-            tableLineColor: [226, 232, 240],
-            tableLineWidth: 0.1,
-          });
-
-          const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
-          if (finalY) {
-            currentY = finalY + 10;
-          }
+        autoTable(doc, {
+          startY: currentY,
+          margin: { left: marginX, right: marginX },
+          head: [["Specifikation", "Värde"]],
+          body: sharedSpecs.map((spec) => [spec.label, spec.value]),
+          styles: {
+            font: baseFont,
+            fontStyle: normalStyle,
+            fontSize: 9,
+            textColor,
+            cellPadding: 2,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.1,
+          },
+          headStyles: {
+            fillColor: [rb, gb, bb],
+            textColor: [255, 255, 255],
+            font: baseFont,
+            fontStyle: boldStyle,
+            fontSize: 9,
+            halign: "left",
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          tableLineColor: [226, 232, 240],
+          tableLineWidth: 0.1,
         });
+
+        const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+        if (finalY) {
+          currentY = finalY + 10;
+        } else {
+          currentY += 20;
+        }
+      }
+
+      if (articleEntries.length > 0) {
+        if (currentY + 30 > pageHeight - 30) {
+          doc.addPage();
+          currentY = 30;
+        }
+
+        doc.setFont(baseFont, boldStyle);
+        doc.setFontSize(13);
+        doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
+        doc.text("Artiklar", marginX, currentY);
+        currentY += 6;
+
+        const headRow = ["Artikelnummer", "Storlek", ...filteredSpecLabels];
+        const tableBody = articleEntries.map((entry) => {
+          const rowValues = filteredSpecLabels.map((label) =>
+            displayValue(entry.specMap.get(label)),
+          );
+          return [displayValue(entry.articleNumber), entry.size, ...rowValues];
+        });
+
+        autoTable(doc, {
+          startY: currentY,
+          margin: { left: marginX, right: marginX },
+          head: [headRow],
+          body: tableBody,
+          styles: {
+            font: baseFont,
+            fontStyle: normalStyle,
+            fontSize: 8,
+            textColor,
+            cellPadding: 1.8,
+            lineColor: [226, 232, 240],
+            lineWidth: 0.1,
+            overflow: "linebreak",
+          },
+          headStyles: {
+            fillColor: [rb, gb, bb],
+            textColor: [255, 255, 255],
+            font: baseFont,
+            fontStyle: boldStyle,
+            fontSize: 8.5,
+            halign: "left",
+          },
+          columnStyles: {
+            0: { fontStyle: boldStyle },
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          tableLineColor: [226, 232, 240],
+          tableLineWidth: 0.1,
+        });
+
+        const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+        if (finalY) {
+          currentY = finalY + 10;
+        }
       }
 
       if (currentY > pageHeight - 30) {
