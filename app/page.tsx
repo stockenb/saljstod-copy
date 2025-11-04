@@ -150,17 +150,14 @@ export default function HomePage() {
           className="pointer-events-none absolute inset-x-1/2 top-1/3 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-white/60 blur-3xl"
           aria-hidden
         />
-        <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-20 sm:px-12">
+        <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-0 sm:px-12">
           <div className="flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-8 shadow-[0_25px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
             <div>
-              <span className="inline-flex items-center rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-sky-600 shadow-sm">
-                Välkommen tillbaka
-              </span>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-m">
                 Stängselplanerare
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
-                Utforska våra planeringsverktyg och resurser för att skapa skräddarsydda stängsellösningar på ett tryggt och effektivt sätt.
+                 
               </p>
             </div>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -168,8 +165,8 @@ export default function HomePage() {
                 <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
               ))}
             </div>
-            <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_14px_35px_rgba(15,23,42,0.08)]">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75">
+              <h3 className="text-m font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 mt-8">
                 Övriga verktyg
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
