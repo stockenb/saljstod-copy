@@ -13,10 +13,10 @@ export function Navbar() {
   const nav = useMemo(
     () => [
       { href: "/", label: "Hem" },
-     // { href: "/besoksrapporter", label: "Kunder" },
-     // { href: "/rapporter", label: "Rapporter" },
-     // { href: "/nyheter", label: "Nyheter" },
-     // { href: "/profil", label: "Profil" },
+      { href: "/produktblad", label: "Produktblad" },
+      { href: "/produktblad/samlat", label: "Samlade produktblad" },
+      { href: "/nyheter", label: "Nyheter" },
+      { href: "https://www.nilsahlgren.se/", label: "Webbshop" },
     ],
     []
   );
@@ -35,7 +35,7 @@ export function Navbar() {
   }, [segments]);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/60 bg-white/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-white/20 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-4 text-sm text-neutral-600 sm:px-8 lg:flex-nowrap lg:px-10">
         <Link href="/" className="flex shrink-0 items-center">
           <Image
@@ -48,7 +48,7 @@ export function Navbar() {
           />
           <span className="sr-only">Säljstöd</span>
         </Link>
-      {/* <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
+    <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
           {nav.map((n) => {
             const isActive = pathname === n.href;
             return (
@@ -58,7 +58,7 @@ export function Navbar() {
                 className={cn(
                   "flex items-center gap-2 rounded-full px-3 py-1.5 transition duration-200 ease-out",
                   isActive
-                    ? "bg-neutral-900 text-white shadow"
+                    ? "bg-primary-800 text-white shadow hover:text-neutral-300"
                     : "text-neutral-500 hover:text-neutral-900"
                 )}
               >
@@ -66,12 +66,12 @@ export function Navbar() {
               </Link>
             );
           })}
-        </nav>*/}
+        </nav>
         <div className="text-xs font-medium uppercase tracking-[0.3em] text-neutral-400">
-          2025
+          Säljstöd - 2025
         </div>
       </div>
-      {breadcrumbItems.length ? (
+      {/*{breadcrumbItems.length ? (
         <div className="border-t border-white/70 bg-white/60 py-2">
           <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 text-xs font-medium text-neutral-500 sm:px-8 lg:px-10">
             <Link href="/" className="text-neutral-500 hover:text-neutral-800">
@@ -91,7 +91,7 @@ export function Navbar() {
             ))}
           </div>
         </div>
-      ) : null}
+      ) : null}*/}
     </header>
   );
 }
