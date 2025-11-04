@@ -600,47 +600,58 @@ export default function CombinedProductSheetPage() {
       const layoutBottom = Math.max(columnLimitY, descriptionBottom);
       currentY = layoutBottom + 12;
 
-      const columnCount = products.length;
-      const rowOrder: string[] = [];
-      const rowMap = new Map<string, string[]>();
-      const ensureRow = (label: string) => {
-        if (!rowMap.has(label)) {
-          rowMap.set(label, Array(columnCount).fill(""));
-          rowOrder.push(label);
-        }
-        return rowMap.get(label)!;
+      const formatValue = (value?: string) => {
+        const trimmed = (value ?? "").trim();
+        return trimmed || "-";
       };
 
-      // Artikeltitlar
-      const titleRow = ensureRow("Benämning");
-      products.forEach((product, index) => {
-        titleRow[index] = product.title || "-";
-      });
-
-      // Vikt
-      const weightRow = ensureRow("Vikt");
-      products.forEach((product, index) => {
-        weightRow[index] = product.weight || "-";
-      });
-
-      // Specifikationer
-      products.forEach((product, productIndex) => {
+      const articleEntries = products.map((product) => {
+        const articleNumber = product.articleNumber || "-";
+        const values = new Map<string, string>();
+        values.set("Benämning", formatValue(product.title));
+        values.set("Vikt", formatValue(product.weight));
         product.specs.forEach((spec) => {
           const label = spec.key.trim() || "Specifikation";
-          const row = ensureRow(label);
-          row[productIndex] = spec.value.trim() || "-";
+          values.set(label, formatValue(spec.value));
+        });
+        return { articleNumber, values };
+      });
+
+      const specLabels: string[] = [];
+      const ensureSpecLabel = (label: string) => {
+        if (!specLabels.includes(label)) {
+          specLabels.push(label);
+        }
+      };
+
+      ensureSpecLabel("Benämning");
+      ensureSpecLabel("Vikt");
+
+      products.forEach((product) => {
+        product.specs.forEach((spec) => {
+          const label = spec.key.trim() || "Specifikation";
+          ensureSpecLabel(label);
         });
       });
 
-      const tableBody = rowOrder
-        .map((label) => {
-          const values = rowMap.get(label) ?? [];
-          return [label, ...values.map((value) => value || "-")];
-        })
-        .filter((row) => row.slice(1).some((value) => value && value !== "-"));
+      const filteredSpecLabels = specLabels.filter((label) => {
+        if (label === "Benämning" || label === "Vikt") {
+          return true;
+        }
+        return articleEntries.some((entry) => {
+          const value = entry.values.get(label);
+          return value && value !== "-";
+        });
+      });
 
-      if (tableBody.length > 0) {
-        const headRow = ["Specifikation", ...products.map((product) => product.articleNumber || "-")];
+      if (filteredSpecLabels.length > 0) {
+        const maxColumnsPerTable = 5;
+        const specColumnsPerTable = Math.max(1, maxColumnsPerTable - 1);
+        const specGroups: string[][] = [];
+
+        for (let index = 0; index < filteredSpecLabels.length; index += specColumnsPerTable) {
+          specGroups.push(filteredSpecLabels.slice(index, index + specColumnsPerTable));
+        }
 
         if (currentY + 40 > pageHeight - 30) {
           doc.addPage();
@@ -653,42 +664,59 @@ export default function CombinedProductSheetPage() {
         doc.text("Översikt", marginX, currentY);
         currentY += 6;
 
-        autoTable(doc, {
-          startY: currentY,
-          margin: { left: marginX, right: marginX },
-          head: [headRow],
-          body: tableBody,
-          styles: {
-            font: baseFont,
-            fontStyle: normalStyle,
-            fontSize: 10,
-            textColor,
-            cellPadding: 3,
-            lineColor: [226, 232, 240],
-            lineWidth: 0.1,
-          },
-          headStyles: {
-            fillColor: [rb, gb, bb],
-            textColor: [255, 255, 255],
-            font: baseFont,
-            fontStyle: boldStyle,
-            fontSize: 11,
-            halign: "left",
-          },
-          columnStyles: {
-            0: { fontStyle: boldStyle },
-          },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252],
-          },
-          tableLineColor: [226, 232, 240],
-          tableLineWidth: 0.1,
-        });
+        specGroups.forEach((group, groupIndex) => {
+          const headRow = ["Artikelnummer", ...group];
+          const tableBody = articleEntries.map((entry) => {
+            const rowValues = group.map((label) => entry.values.get(label) || "-");
+            return [entry.articleNumber, ...rowValues];
+          });
 
-        const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
-        if (finalY) {
-          currentY = finalY + 10;
-        }
+          if (groupIndex > 0) {
+            currentY += 4;
+          }
+
+          if (currentY + 30 > pageHeight - 30) {
+            doc.addPage();
+            currentY = 30;
+          }
+
+          autoTable(doc, {
+            startY: currentY,
+            margin: { left: marginX, right: marginX },
+            head: [headRow],
+            body: tableBody,
+            styles: {
+              font: baseFont,
+              fontStyle: normalStyle,
+              fontSize: 10,
+              textColor,
+              cellPadding: 3,
+              lineColor: [226, 232, 240],
+              lineWidth: 0.1,
+            },
+            headStyles: {
+              fillColor: [rb, gb, bb],
+              textColor: [255, 255, 255],
+              font: baseFont,
+              fontStyle: boldStyle,
+              fontSize: 11,
+              halign: "left",
+            },
+            columnStyles: {
+              0: { fontStyle: boldStyle },
+            },
+            alternateRowStyles: {
+              fillColor: [248, 250, 252],
+            },
+            tableLineColor: [226, 232, 240],
+            tableLineWidth: 0.1,
+          });
+
+          const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+          if (finalY) {
+            currentY = finalY + 10;
+          }
+        });
       }
 
       if (currentY > pageHeight - 30) {
