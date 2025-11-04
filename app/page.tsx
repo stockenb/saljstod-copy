@@ -64,9 +64,9 @@ function CardLink({ card }: { card: Card }) {
   const isInactive = !card.href; // tom href => inaktivt kort
 
   const baseClasses =
-    "group relative flex h-full flex-col rounded-2xl border border-white/40 bg-white/80 shadow-sm transition backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white/60";
+    "group relative flex h-full flex-col rounded-2xl border border-white/70 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/5 transition backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white/70";
   const hoverActive = !isInactive
-    ? "hover:-translate-y-1 hover:border-white/60 hover:shadow-lg hover:shadow-slate-900/10"
+    ? "hover:-translate-y-1 hover:border-white/90 hover:shadow-[0_28px_65px_rgba(15,23,42,0.18)] hover:ring-slate-900/10"
     : "";
   const padding = isCompact ? "p-4" : "p-6";
   const titleClasses = `mt-4 font-semibold text-slate-900 ${
@@ -168,11 +168,11 @@ export default function HomePage() {
                 <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
               ))}
             </div>
-            <div className="flex flex-col gap-4 rounded-2xl border border-white/50 bg-white/60 p-6 shadow-inner">
+            <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_14px_35px_rgba(15,23,42,0.08)]">
               <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Övriga verktyg
               </h3>
-              <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {secondaryCards.map((card) => (
                   <CardLink key={`${card.title}-${card.href}`} card={card} />
                 ))}
