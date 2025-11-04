@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const L_PATTERNS: Record<string, string> = {
   "0": "0001101",
@@ -332,72 +335,81 @@ export default function Home() {
     return `Kontrollsiffran är ${encoded.digits.slice(-1)} (full kod: ${encoded.digits}).`;
   }, [encoded]);
 
-  return (
-    <div className="min-h-screen bg-neutral-100 text-neutral-900">
-      <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 pb-16 pt-20">
-        <header className="flex flex-col gap-2 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">EAN-13 till streckkod</h1>
-          <p className="text-neutral-600">
-            Klistra in en EAN-13-kod så ritar vi upp en streckkod som du kan ladda ner som PNG.
-          </p>
-        </header>
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      handleGenerate();
+    },
+    [handleGenerate]
+  );
 
-        <div className="flex flex-col gap-4 rounded-xl bg-white p-6 shadow-sm">
-          <label className="flex flex-col gap-2 text-sm font-medium text-neutral-700" htmlFor="ean-input">
-            EAN-13-kod
-            <input
+  return (
+    <div className="space-y-10">
+      <div className="max-w-3xl space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Skapa EAN</h1>
+        <p className="text-sm text-neutral-600">
+          Skapa en streckkod från en EAN-13-kod och ladda ner den som PNG för att använda i dina
+          material.
+        </p>
+      </div>
+
+      <section className="space-y-6 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-neutral-900">Generera streckkod</h2>
+          <p className="text-sm text-neutral-600">
+            Ange en giltig EAN-13-kod så ritar vi upp streckkoden och kontrollerar siffrorna åt dig.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-700" htmlFor="ean-input">
+              EAN-13-kod
+            </label>
+            <Input
               id="ean-input"
               value={input}
               onChange={(event) => setInput(event.target.value.replace(/\s+/g, ""))}
               placeholder="Exempel: 731869011290"
-              className="rounded-lg border border-neutral-300 px-3 py-2 text-base font-normal text-neutral-900 outline-hidden focus:border-neutral-500 focus:ring-2 focus:ring-neutral-400"
               inputMode="numeric"
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
             />
-          </label>
-          <p className="text-sm text-neutral-500">{helperText}</p>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleGenerate}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700"
-            >
-              Generera streckkod
-            </button>
-            <button
-              type="button"
-              disabled={!encoded}
-              onClick={handleDownload}
-              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-500 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-300"
-            >
-              Ladda ner PNG
-            </button>
+            <p className="text-xs text-neutral-500">{helperText}</p>
           </div>
-        </div>
 
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          {encoded ? (
-            <div className="flex flex-col items-center gap-4">
-              <canvas ref={canvasRef} className="max-w-full" aria-label="Genererad streckkod" />
-              <code
-                className="rounded bg-neutral-100 px-3 py-2"
-                style={{
-                  fontFamily: DIGIT_FONT_FAMILY,
-                  fontSize: DIGIT_FONT_SIZE,
-                  fontWeight: DIGIT_FONT_WEIGHT,
-                }}
-              >
-                {encoded.digits}
-              </code>
-            </div>
-          ) : (
-            <p className="text-sm text-neutral-500">Ingen streckkod genererad ännu.</p>
-          )}
-        </div>
-      </div>
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Button type="submit">Generera streckkod</Button>
+            <Button type="button" disabled={!encoded} onClick={handleDownload} variant="outline">
+              Ladda ner PNG
+            </Button>
+          </div>
+        </form>
+      </section>
+
+      <section className="space-y-4 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-neutral-900">Förhandsgranskning</h2>
+        {encoded ? (
+          <div className="flex flex-col items-center gap-4">
+            <canvas ref={canvasRef} className="max-w-full" aria-label="Genererad streckkod" />
+            <code
+              className="rounded-2xl bg-neutral-100 px-4 py-2 text-base font-semibold tracking-[0.2em] text-neutral-800"
+              style={{
+                fontFamily: DIGIT_FONT_FAMILY,
+                fontSize: DIGIT_FONT_SIZE,
+                fontWeight: DIGIT_FONT_WEIGHT,
+              }}
+            >
+              {encoded.digits}
+            </code>
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-600">Ingen streckkod genererad ännu.</p>
+        )}
+      </section>
     </div>
   );
 }
