@@ -532,7 +532,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
             bottom: imageY + imageHeight,
           };
           columnWidth = Math.max(imageX - marginX - columnGap, 40);
-          columnLimitY = imageLayout.bottom + 6;
+          columnLimitY = imageLayout.bottom + 20;
         } catch (imageError) {
           console.warn("Kunde inte lägga till bild i PDF", imageError);
         }
