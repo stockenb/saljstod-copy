@@ -136,49 +136,51 @@ function CardLink({ card }: { card: Card }) {
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-50 via-white to-sky-100">
-      <div
-        className="pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-sky-200/60 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-indigo-200/40 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-x-1/2 top-1/3 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-white/60 blur-3xl"
-        aria-hidden
-      />
-      <section className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-20 sm:px-12">
-        <div className="flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-8 shadow-[0_25px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-          <div>
-            <span className="inline-flex items-center rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-sky-600 shadow-sm">
-              Välkommen tillbaka
-            </span>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Stängselplanerare
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
-              Utforska våra planeringsverktyg och resurser för att skapa skräddarsydda stängsellösningar på ett tryggt och effektivt sätt.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {primaryCards.map((card) => (
-              <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
-            ))}
-          </div>
-          <div className="flex flex-col gap-4 rounded-2xl border border-white/50 bg-white/60 p-6 shadow-inner">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Övriga verktyg
-            </h3>
-            <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-              {secondaryCards.map((card) => (
-                <CardLink key={`${card.title}-${card.href}`} card={card} />
+    <div className="relative isolate">
+      <div className="relative left-1/2 right-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-sky-100 py-12 sm:py-16 min-h-[calc(100vh-8rem)]">
+        <div
+          className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-sky-200/60 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-28 bottom-0 h-[22rem] w-[22rem] rounded-full bg-indigo-200/40 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-1/2 top-1/3 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-white/60 blur-3xl"
+          aria-hidden
+        />
+        <section className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-20 sm:px-12">
+          <div className="flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-8 shadow-[0_25px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+            <div>
+              <span className="inline-flex items-center rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-sky-600 shadow-sm">
+                Välkommen tillbaka
+              </span>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                Stängselplanerare
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
+                Utforska våra planeringsverktyg och resurser för att skapa skräddarsydda stängsellösningar på ett tryggt och effektivt sätt.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {primaryCards.map((card) => (
+                <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
               ))}
             </div>
+            <div className="flex flex-col gap-4 rounded-2xl border border-white/50 bg-white/60 p-6 shadow-inner">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Övriga verktyg
+              </h3>
+              <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
+                {secondaryCards.map((card) => (
+                  <CardLink key={`${card.title}-${card.href}`} card={card} />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </div>
+    </div>
   );
 }
