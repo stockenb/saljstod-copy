@@ -64,14 +64,20 @@ function CardLink({ card }: { card: Card }) {
   const isInactive = !card.href; // tom href => inaktivt kort
 
   const baseClasses =
-    "group relative flex h-full flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400";
-  const hoverActive = !isInactive ? "hover:-translate-y-0.5 hover:shadow-md" : "";
+    "group relative flex h-full flex-col rounded-2xl border border-white/70 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/5 transition backdrop-blur-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white/70";
+  const hoverActive = !isInactive
+    ? "hover:-translate-y-1 hover:border-white/90 hover:shadow-[0_28px_65px_rgba(15,23,42,0.18)] hover:ring-slate-900/10"
+    : "";
   const padding = isCompact ? "p-4" : "p-6";
-  const titleClasses = `mt-4 font-semibold text-neutral-900 ${isCompact ? "text-lg" : "text-xl"}`;
-  const descriptionClasses = `mt-2 text-neutral-600 ${isCompact ? "text-xs" : "text-sm"}`;
+  const titleClasses = `mt-4 font-semibold text-slate-900 ${
+    isCompact ? "text-lg" : "text-xl"
+  }`;
+  const descriptionClasses = `mt-2 text-slate-600 ${
+    isCompact ? "text-xs" : "text-sm"
+  }`;
   const ctaClasses = `mt-auto inline-flex items-center gap-1 pt-6 font-medium ${
     isCompact ? "text-xs" : "text-sm"
-  } ${isInactive ? "text-neutral-500" : "text-neutral-900"}`;
+  } ${isInactive ? "text-slate-500" : "text-slate-900"}`;
 
   const content = (
     <>
@@ -94,7 +100,7 @@ function CardLink({ card }: { card: Card }) {
       {isInactive && (
         <>
           <div
-            className="pointer-events-none absolute inset-0 rounded-2xl bg-neutral-100/50"
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-white/50"
             aria-hidden
           />
           <div className="pointer-events-none absolute inset-0 rounded-2xl backdrop-grayscale backdrop-opacity-80" aria-hidden />
@@ -130,30 +136,51 @@ function CardLink({ card }: { card: Card }) {
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen w-full bg-neutral-50">
-      <section className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-16">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Stängselplanerare</h1>
-          <p className="mt-2 text-sm text-neutral-600">
-            Välj vilken stängselplanerare du vill öppna.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          {primaryCards.map((card) => (
-            <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
-          ))}
-        </div>
-        <div className="pt-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Övriga verktyg
-          </h3>
-          <div className="mt-3 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-            {secondaryCards.map((card) => (
-              <CardLink key={`${card.title}-${card.href}`} card={card} />
-            ))}
+    <div className="relative isolate -mx-6 -mt-10 pb-10 sm:-mx-8 lg:-mx-10">
+      <div className="relative left-1/2 right-1/2 w-screen -translate-x-1/2 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-sky-100 py-12 sm:py-16 min-h-[calc(100vh-8rem)]">
+        <div
+          className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-sky-200/60 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-28 bottom-0 h-[22rem] w-[22rem] rounded-full bg-indigo-200/40 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-1/2 top-1/3 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-white/60 blur-3xl"
+          aria-hidden
+        />
+        <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-20 sm:px-12">
+          <div className="flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-8 shadow-[0_25px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+            <div>
+              <span className="inline-flex items-center rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-sky-600 shadow-sm">
+                Välkommen tillbaka
+              </span>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                Stängselplanerare
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
+                Utforska våra planeringsverktyg och resurser för att skapa skräddarsydda stängsellösningar på ett tryggt och effektivt sätt.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              {primaryCards.map((card) => (
+                <CardLink key={`${card.title}-${card.href || card.title}`} card={card} />
+              ))}
+            </div>
+            <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_14px_35px_rgba(15,23,42,0.08)]">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Övriga verktyg
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {secondaryCards.map((card) => (
+                  <CardLink key={`${card.title}-${card.href}`} card={card} />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </div>
+    </div>
   );
 }
