@@ -330,6 +330,15 @@ export default function CatalogGeneratorPage() {
     return values.length > 0 && values.every(Boolean);
   }, [categorySelection]);
 
+  const includeAllIndeterminate = useMemo(
+    () => selectedCategoryCount > 0 && !areAllCategoriesSelected,
+    [areAllCategoriesSelected, selectedCategoryCount]
+  );
+
+  const includeAllCheckboxRef = useIndeterminateCheckbox(
+    includeAllIndeterminate
+  );
+
   const selectedAppendixCount = useMemo(
     () => Object.values(appendixSelection).filter(Boolean).length,
     [appendixSelection]
@@ -340,8 +349,10 @@ export default function CatalogGeneratorPage() {
 
   const isKoncernSelected = appendixSelection[KONCERN_SECTION_ID] ?? false;
 
-  const handleIncludeAllCategories = () => {
-    setCategorySelection(() => createInitialSelection(placeholderCategories, true));
+  const handleToggleAllCategories = (checked: boolean) => {
+    setCategorySelection(() =>
+      createInitialSelection(placeholderCategories, checked)
+    );
   };
 
   function toggleCategoryGroup(category: CatalogCategory, checked: boolean) {
@@ -389,10 +400,10 @@ export default function CatalogGeneratorPage() {
       const slateDark: [number, number, number] = [30, 41, 59];
       const slateText: [number, number, number] = [71, 85, 105];
 
-      const pageMarginX = 20;
-      const pageMarginTop = 26;
-      const pageMarginBottom = 20;
-      const lineHeight = 6;
+      const pageMarginX = 18;
+      const pageMarginTop = 22;
+      const pageMarginBottom = 16;
+      const lineHeight = 5.5;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const contentWidth = pageWidth - pageMarginX * 2;
@@ -434,101 +445,60 @@ export default function CatalogGeneratorPage() {
         (section) => appendixSelection[section.id]
       );
 
-      const totalCategoryItems = categoryBlocks.reduce((count, block) => {
-        return (
-          count +
-          (block.includeWholeCategory ? 1 : block.selectedSubcategories.length)
-        );
-      }, 0);
-
       const [brandR, brandG, brandB] = brandBlue;
-      const headerHeight = 34;
+      const headerHeight = 30;
 
       doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(pageMarginX, cursorY, contentWidth, headerHeight, 6, 6, "F");
+      doc.roundedRect(pageMarginX, cursorY, contentWidth, headerHeight, 5, 5, "F");
 
       doc.setTextColor(255, 255, 255);
       doc.setFont(baseFont, boldStyle);
-      doc.setFontSize(20);
-      doc.text("Katalogöversikt", pageMarginX + 10, cursorY + 14);
+      doc.setFontSize(19);
+      doc.text("Produktkatalog", pageMarginX + 10, cursorY + 12);
 
       doc.setFont(baseFont, normalStyle);
-      doc.setFontSize(11);
+      doc.setFontSize(10.5);
       doc.setTextColor(226, 232, 240);
       doc.text(
         `Genererad ${new Date().toLocaleDateString("sv-SE")}`,
         pageMarginX + 10,
-        cursorY + 23
+        cursorY + 20
       );
 
-      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.setLineWidth(1.2);
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.6);
       doc.line(
         pageMarginX + 10,
-        cursorY + headerHeight - 6,
-        pageMarginX + 60,
-        cursorY + headerHeight - 6
+        cursorY + headerHeight - 5,
+        pageMarginX + 56,
+        cursorY + headerHeight - 5
       );
 
-      cursorY += headerHeight + 14;
+      cursorY += headerHeight + 8;
 
-      doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-      doc.setFont(baseFont, boldStyle);
-      doc.setFontSize(13);
-      doc.text("Sammanfattning", pageMarginX, cursorY);
-      cursorY += 8;
-
-      const statGap = 10;
-      const statBoxWidth = (contentWidth - statGap) / 2;
-      const statBoxHeight = 26;
-      const stats = [
-        { label: "Valda kategorier", value: totalCategoryItems.toString() },
-        { label: "Valda bilagor", value: selectedAppendices.length.toString() },
-      ];
-
-      stats.forEach((stat, index) => {
-        const boxX = pageMarginX + index * (statBoxWidth + statGap);
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(boxX, cursorY, statBoxWidth, statBoxHeight, 5, 5, "F");
-        doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(boxX, cursorY, statBoxWidth, statBoxHeight, 5, 5, "S");
-
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(14);
-        doc.setTextColor(brandR, brandG, brandB);
-        doc.text(stat.value, boxX + 10, cursorY + 14);
-
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text(stat.label.toUpperCase(), boxX + 10, cursorY + 20);
-      });
-
-      cursorY += statBoxHeight + 14;
+      doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+      doc.setFont(baseFont, normalStyle);
+      doc.setFontSize(11);
+      const introLines = doc.splitTextToSize(
+        "Detta är en planerad struktur för katalogen. När XML-filen kopplas in hämtas innehåll och sidlayout automatiskt.",
+        contentWidth
+      );
+      doc.text(introLines, pageMarginX, cursorY);
+      cursorY += introLines.length * lineHeight + 4;
 
       if (categoryBlocks.length) {
         doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(14);
+        doc.setFontSize(13.5);
         doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
         doc.text("Kategorier & avsnitt", pageMarginX, cursorY);
         doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
         doc.setLineWidth(0.6);
-        doc.line(pageMarginX, cursorY + 2, pageMarginX + 48, cursorY + 2);
+        doc.line(pageMarginX, cursorY + 2, pageMarginX + 44, cursorY + 2);
 
-        cursorY += 10;
-
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
-        doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-        const introLines = doc.splitTextToSize(
-          "Detta är en planerad struktur för katalogen. När XML-filen kopplas in hämtas innehåll och sidlayout automatiskt.",
-          contentWidth
-        );
-        doc.text(introLines, pageMarginX, cursorY);
-        cursorY += introLines.length * lineHeight + 6;
+        cursorY += 8;
       }
 
-      const accentBarWidth = 3;
+      const accentBarWidth = 2.5;
 
       categoryBlocks.forEach((block) => {
         const blockHeight = estimateCategoryBlockHeight(doc, {
@@ -543,16 +513,16 @@ export default function CatalogGeneratorPage() {
           accentBarWidth,
         });
 
-        ensureSpace(blockHeight + 12);
+        ensureSpace(blockHeight + 8);
 
         const blockTop = cursorY;
-        const paddingTop = 8;
-        const textX = pageMarginX + accentBarWidth + 6;
+        const paddingTop = 6;
+        const textX = pageMarginX + accentBarWidth + 5.5;
 
-        doc.setFillColor(248, 250, 252);
-        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 6, 6, "F");
+        doc.setFillColor(247, 250, 252);
+        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 5, 5, "F");
         doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 6, 6, "S");
+        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 5, 5, "S");
 
         doc.setFillColor(brandR, brandG, brandB);
         doc.rect(pageMarginX, blockTop, accentBarWidth, blockHeight, "F");
@@ -560,13 +530,13 @@ export default function CatalogGeneratorPage() {
         let textY = blockTop + paddingTop;
 
         doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(13);
+        doc.setFontSize(12.5);
         doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
         doc.text(block.category.name, textX, textY);
-        textY += 6;
+        textY += 5.5;
 
         doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
+        doc.setFontSize(10.5);
         doc.setTextColor(slateText[0], slateText[1], slateText[2]);
 
         if (block.category.description) {
@@ -582,7 +552,7 @@ export default function CatalogGeneratorPage() {
 
         if (block.includeWholeCategory) {
           doc.text("• Komplett kategori", textX, textY);
-          textY += lineHeight + 2;
+          textY += lineHeight + 1.5;
         }
 
         block.selectedSubcategories.forEach((subcategory) => {
@@ -591,26 +561,26 @@ export default function CatalogGeneratorPage() {
 
           if (subcategory.description) {
             doc.setFont(baseFont, normalStyle);
-            doc.setFontSize(10.5);
+            doc.setFontSize(10);
             doc.setTextColor(slateText[0], slateText[1], slateText[2]);
             const subLines = doc.splitTextToSize(
               subcategory.description,
               contentWidth - accentBarWidth - 16
             );
             doc.text(subLines, textX + 4, textY);
-            textY += subLines.length * lineHeight + 2;
+            textY += subLines.length * lineHeight + 1.5;
             doc.setFont(baseFont, normalStyle);
-            doc.setFontSize(11);
+            doc.setFontSize(10.5);
             doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
           }
         });
 
-        cursorY = blockTop + blockHeight + 10;
+        cursorY = blockTop + blockHeight + 6;
       });
 
       if (selectedAppendices.length) {
         doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
+        doc.setFontSize(10.5);
 
         const appendixEntries = selectedAppendices.map((appendix) => ({
           appendix,
@@ -620,39 +590,41 @@ export default function CatalogGeneratorPage() {
         }));
 
         const appendixHeight =
-          16 +
+          12 +
           appendixEntries.reduce((height, entry) => {
             const descriptionHeight = entry.descriptionLines
               ? entry.descriptionLines.length * lineHeight
               : 0;
-            return height + lineHeight + descriptionHeight + 2;
+            return height + lineHeight + descriptionHeight + 1.5;
           }, 0);
 
-        ensureSpace(appendixHeight);
+        ensureSpace(appendixHeight + 4);
 
         doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(14);
+        doc.setFontSize(13);
         doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
         doc.text("Bilagor", pageMarginX, cursorY);
         doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-        doc.line(pageMarginX, cursorY + 2, pageMarginX + 32, cursorY + 2);
-        cursorY += 9;
+        doc.line(pageMarginX, cursorY + 2, pageMarginX + 30, cursorY + 2);
+        cursorY += 7;
 
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
-        doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-
-        appendixEntries.forEach((entry) => {
-          doc.text(`• ${entry.appendix.title}`, pageMarginX + 2, cursorY);
+        appendixEntries.forEach(({ appendix, descriptionLines }) => {
+          doc.setFont(baseFont, normalStyle);
+          doc.setFontSize(10.5);
+          doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+          doc.text(`• ${appendix.title}`, pageMarginX, cursorY);
           cursorY += lineHeight;
 
-          if (entry.descriptionLines) {
-            doc.text(entry.descriptionLines, pageMarginX + 8, cursorY);
-            cursorY += entry.descriptionLines.length * lineHeight;
+          if (descriptionLines) {
+            doc.setFont(baseFont, normalStyle);
+            doc.setFontSize(9.5);
+            doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+            doc.text(descriptionLines, pageMarginX + 4, cursorY);
+            cursorY += descriptionLines.length * lineHeight + 1.5;
           }
-
-          cursorY += 2;
         });
+
+        cursorY += 4;
       }
 
       if (isKoncernSelected) {
@@ -771,14 +743,23 @@ export default function CatalogGeneratorPage() {
                 Kategorierna nedan är preliminära. När XML-strukturen är klar laddas listan automatiskt från filen och dina val sparas här.
               </p>
             </header>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleIncludeAllCategories}
-              disabled={areAllCategoriesSelected}
+            <label
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm transition",
+                areAllCategoriesSelected
+                  ? "border-sky-300 bg-sky-50 text-sky-800"
+                  : "border-neutral-200 bg-white text-slate-700 hover:border-sky-200 hover:bg-sky-50"
+              )}
             >
+              <input
+                ref={includeAllCheckboxRef}
+                type="checkbox"
+                className="h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                checked={areAllCategoriesSelected}
+                onChange={(event) => handleToggleAllCategories(event.target.checked)}
+              />
               Inkludera allt
-            </Button>
+            </label>
           </div>
 
           <div className="space-y-4">
@@ -1052,16 +1033,16 @@ function estimateCategoryBlockHeight(
   const previousFont = doc.getFont();
   const previousFontSize = doc.getFontSize();
 
-  const paddingTop = 8;
-  const paddingBottom = 8;
+  const paddingTop = 6;
+  const paddingBottom = 6;
   let height = paddingTop;
 
   doc.setFont(baseFont, boldStyle);
-  doc.setFontSize(13);
-  height += 6;
+  doc.setFontSize(12.5);
+  height += 5.5;
 
   doc.setFont(baseFont, normalStyle);
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
 
   if (category.description) {
     const descriptionLines = doc.splitTextToSize(
@@ -1072,7 +1053,7 @@ function estimateCategoryBlockHeight(
   }
 
   if (includeWholeCategory) {
-    height += lineHeight + 2;
+    height += lineHeight + 1.5;
   }
 
   selectedSubcategories.forEach((subcategory) => {
@@ -1082,7 +1063,7 @@ function estimateCategoryBlockHeight(
         subcategory.description,
         contentWidth - accentBarWidth - 16
       );
-      height += subLines.length * lineHeight + 2;
+      height += subLines.length * lineHeight + 1.5;
     }
   });
 
