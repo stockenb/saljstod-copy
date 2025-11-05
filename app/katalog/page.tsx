@@ -722,15 +722,12 @@ export default function CatalogGeneratorPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 mt-10">
       <header className="space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">
-          Katalog
-        </span>
-        <h1 className="text-2xl font-semibold text-slate-900">Generera katalog</h1>
-        <p className="max-w-2xl text-sm text-neutral-600">
-          Här förbereder vi stödet för att skapa en kundanpassad katalog utifrån en XML-fil som kommer läsas in i nästa steg.
-          Välj de kategorier och bilagor som ska ingå så kopplar vi ihop dem med innehållet när strukturen är på plats.
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Generera katalog</h1>
+        <p className="text-sm text-neutral-600">
+          Hämta artikelinformation från produktflödet, justera innehållet och spara ett färdigt
+          produktblad som PDF.
         </p>
       </header>
 
@@ -740,7 +737,7 @@ export default function CatalogGeneratorPage() {
             <header className="max-w-xl space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">Välj kategorier</h2>
               <p className="text-sm text-neutral-600">
-                Kategorierna nedan är preliminära. När XML-strukturen är klar laddas listan automatiskt från filen och dina val sparas här.
+                Kryssa i de kategorier du vill inkludera i din produktkatalog. Du kan även välja att inkludera allt genom att kryssa i rutan till höger.
               </p>
             </header>
             <label
@@ -823,12 +820,9 @@ export default function CatalogGeneratorPage() {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-6">
+          <section className="space-y-1 rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-6">
             <header className="space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">Sammanfattning</h2>
-              <p className="text-sm text-neutral-600">
-                I nästa steg ersätts detta med en förhandsgranskning av katalogens struktur och ett utkast till PDF.
-              </p>
             </header>
             <ul className="space-y-2 text-sm text-slate-700">
               <li>

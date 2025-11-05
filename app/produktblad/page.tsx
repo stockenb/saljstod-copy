@@ -757,7 +757,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 mt-10">
       <div className="max-w-3xl space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Skapa produktblad</h1>
         <p className="text-sm text-neutral-600">
