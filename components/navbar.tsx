@@ -68,7 +68,7 @@ export function Navbar() {
           })}
         </nav>
         <div className="text-xs font-medium uppercase tracking-[0.3em] text-neutral-400">
-          Säljstöd - 2025
+          Säljstöd - {new Date().getFullYear()}
         </div>
       </div>
       {/*{breadcrumbItems.length ? (

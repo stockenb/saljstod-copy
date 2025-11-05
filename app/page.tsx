@@ -17,7 +17,7 @@ const primaryCards: Card[] = [
   },
   {
     href: "https://industristangsel.vercel.app/",
-    title: "Industristängsel - Under produktion",
+    title: "Industristängsel",
     description: "Stängselplanerare för industristängsel + XML-export",
     emoji: "🏭",
   },
@@ -37,10 +37,10 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
-    href: "/ean",
-    title: "Skapa EAN",
-    description: "Skapa egna EAN13-koder",
-    emoji: "🏷️",
+    href: "",
+    title: "Generera katalog",
+    description: "Generera katalog utifrån valda kategorier.",
+    emoji: "📒",
     variant: "compact" as const,
   },
   {
@@ -55,6 +55,13 @@ const secondaryCards: Card[] = [
     title: "Skapa samlat produktblad",
     description: "Skapa ett produktblad med flera artiklar.",
     emoji: "🧰",
+    variant: "compact" as const,
+  },
+  {
+    href: "/ean",
+    title: "Skapa EAN",
+    description: "Skapa egna EAN13-koder.",
+    emoji: "🏷️",
     variant: "compact" as const,
   },
 ];
