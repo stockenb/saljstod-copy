@@ -25,55 +25,164 @@ interface AppendixSection {
 
 const placeholderCategories: CatalogCategory[] = [
   {
-    id: "mobilt-stangsel",
-    name: "Mobilt stängsel",
-    description: "System och tillbehör för tillfälliga avspärrningar.",
+    id: "skruv",
+    name: "Skruv",
     subcategories: [
       {
-        id: "mobilt-stangsel-standardpaneler",
-        name: "Standardpaneler",
-        description: "Paneler för tillfälliga arbetsplatser och eventområden.",
+        id: "skruv-traskruv",
+        name: "Träskruv",
       },
       {
-        id: "mobilt-stangsel-grindar",
-        name: "Grindar",
-        description: "Gång- och fordonspassager som matchar de mobila panelerna.",
+        id: "skruv-byggskruv",
+        name: "Byggskruv",
       },
       {
-        id: "mobilt-stangsel-tillbehor",
-        name: "Tillbehör",
-        description: "Fötter, kopplingar och övriga komplement för montage.",
+        id: "skruv-bandad-skruv",
+        name: "Bandad skruv",
       },
     ],
   },
   {
-    id: "industristangsel",
-    name: "Industristängsel",
-    description: "Robusta lösningar för industrier och andra skyddade områden.",
+    id: "bult",
+    name: "Bult",
     subcategories: [
       {
-        id: "industristangsel-nat",
-        name: "Stängselnät",
+        id: "bult-brickor",
+        name: "Brickor",
       },
       {
-        id: "industristangsel-stolpar",
-        name: "Stolpar",
+        id: "bult-bult-kit",
+        name: "Bult-kit",
       },
       {
-        id: "industristangsel-grindar",
-        name: "Grindar",
+        id: "bult-gangstanger",
+        name: "Gängstänger",
+      },
+      {
+        id: "bult-lyftoglor",
+        name: "Lyftöglor",
+      },
+      {
+        id: "bult-mutter",
+        name: "Mutter",
+      },
+      {
+        id: "bult-sexkantskruv",
+        name: "Sexkantskruv",
+      },
+      {
+        id: "bult-vagnsbult",
+        name: "Vagnsbult",
       },
     ],
   },
   {
-    id: "bullerskydd",
-    name: "Bullerskydd",
-    description: "Absorberande och reflekterande lösningar för bullerdämpning.",
+    id: "infastning",
+    name: "Infästning",
+    subcategories: [
+      {
+        id: "infastning-tung-ingfastning",
+        name: "Tung ingfästning",
+      },
+      {
+        id: "infastning-lattare-inf",
+        name: "Lättare infästning",
+      },
+      {
+        id: "infastning-karminfastning",
+        name: "Karminfästning",
+      },
+      {
+        id: "infastning-plugg-spik",
+        name: "Plugg & spik",
+      },
+      {
+        id: "infastning-tillbehor",
+        name: "Tillbehör infästning",
+      },
+    ],
   },
   {
-    id: "intrangningsskydd",
-    name: "Intrångsskydd",
-    description: "Skyddssystem som förhindrar obehörigt intrång.",
+    id: "spik",
+    name: "Spik",
+    subcategories: [
+      {
+        id: "spik-spik",
+        name: "Spik",
+      },
+      {
+        id: "spik-bandad-spik",
+        name: "Bandad spik",
+      },
+    ],
+  },
+  {
+    id: "byggbeslag",
+    name: "Byggbeslag",
+    subcategories: [
+      {
+        id: "byggbeslag-balkskor",
+        name: "Balkskor",
+      },
+      {
+        id: "byggbeslag-vinkelbeslag",
+        name: "Vinkelbeslag",
+      },
+      {
+        id: "byggbeslag-spikplatar",
+        name: "Spikplåtar",
+      },
+      {
+        id: "byggbeslag-stolphallare-plintjarn",
+        name: "Stolphållare & plintjärn",
+      },
+      {
+        id: "byggbeslag-platband",
+        name: "Plåtband",
+      },
+      {
+        id: "byggbeslag-ovriga",
+        name: "Övriga byggbeslag",
+      },
+    ],
+  },
+  {
+    id: "ovrigt-bygg",
+    name: "Övrigt bygg",
+    subcategories: [
+      {
+        id: "ovrigt-bygg-hinkar",
+        name: "Hinkar",
+      },
+      {
+        id: "ovrigt-bygg-trad",
+        name: "Tråd",
+      },
+      {
+        id: "ovrigt-bygg-skottkarror",
+        name: "Skottkärror",
+      },
+      {
+        id: "ovrigt-bygg-nat",
+        name: "Nät",
+      },
+      {
+        id: "ovrigt-bygg-sprayfarg",
+        name: "Sprayfärg",
+      },
+      {
+        id: "ovrigt-bygg-skyddsutrustning",
+        name: "Skyddsutrustning",
+      },
+      {
+        id: "ovrigt-bygg-kapskivor-sagblad",
+        name: "Kapskivor & sågblad",
+      },
+      {
+        id: "ovrigt-bygg-troskeljarn",
+        name: "Tröskeljärn",
+      },
+    ],
   },
 ];
 
