@@ -479,7 +479,7 @@ doc.setFillColor(rb, gb, bb);
 doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       doc.setFont(baseFont, boldStyle);
-      doc.setFontSize(22);
+      doc.setFontSize(19);
       doc.setTextColor(255, 255, 255);
       doc.text(form.title || "Produktblad", marginX + 8, headerTop + 12);
 

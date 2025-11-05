@@ -505,7 +505,7 @@ export default function CombinedProductSheetPage() {
       let currentY = headerTop + 34;
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
 
-      const articleNumbers = products.map((product) => product.articleNumber).filter(Boolean);
+      /*const articleNumbers = products.map((product) => product.articleNumber).filter(Boolean);
       if (articleNumbers.length > 0) {
         doc.setFont(baseFont, boldStyle);
         doc.setFontSize(13);
@@ -520,7 +520,7 @@ export default function CombinedProductSheetPage() {
         const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
         doc.text(articleLines, marginX, currentY);
         currentY += articleLines.length * lineHeight + 6;
-      }
+      }*/
 
       const image = await convertImageToDataUrl(sharedImage);
       const columnGap = 12;
