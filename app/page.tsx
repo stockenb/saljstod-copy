@@ -37,7 +37,7 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
-    href: "",
+    href: "/katalog",
     title: "Generera katalog",
     description: "Generera katalog utifrån valda kategorier.",
     emoji: "📒",
