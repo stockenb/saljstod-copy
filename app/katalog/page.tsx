@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface CatalogSubcategory {
   id: string;
@@ -76,25 +77,78 @@ const placeholderCategories: CatalogCategory[] = [
   },
 ];
 
+const KONCERN_SECTION_ID = "koncerninformation";
+
 const appendixSections: AppendixSection[] = [
   {
-    id: "koncerninformation",
+    id: KONCERN_SECTION_ID,
     title: "Information om koncernen",
-    description: "Presentationssidor med kontaktuppgifter och historia.",
+    description: "Presentation om koncernen.",
   },
   {
     id: "reklam-stangsel",
-    title: "Reklam & stängsellösningar",
-    description: "Inkludera marknadsföringssidor kring speciallösningar.",
+    title: "Stängsel-reklam",
+    description: "Inkludera blänkare om stängsel.",
   },
   {
-    id: "villkor",
-    title: "Allmänna villkor",
-    description: "Standardiserade villkorssidor för upphandlingar.",
+    id: "historia",
+    title: "Ahlgrens historia",
+    description: "Information om Nils Ahlgren AB historia.",
+  },
+   {
+    id: "smapack",
+    title: "Småpack",
+    description: "Inkludera bilder och informatiom om SB-pack",
+  },
+   {
+    id: "miljo",
+    title: "Kvalitet och miljö",
+    description: "Sida om vårt miljöfokus.",
+  },
+   {
+    id: "packstugan",
+    title: "Packstugan",
+    description: "Information om packstugan",
   },
 ];
 
 type SelectionState = Record<string, boolean>;
+
+type PdfState =
+  | { status: "idle" }
+  | { status: "loading"; message: string }
+  | { status: "success"; message: string }
+  | { status: "error"; message: string };
+
+const koncernIntro =
+  "Nils Ahlgren AB är ett helägt dotterbolag till Skyllbergs Bruks AB. Bilden visar koncernens huvudkontor i Skyllberg.";
+
+const koncernCompanies = [
+  {
+    name: "Skyllbergs Bruks AB",
+    description:
+      "Koncernens moderbolag Skyllbergs Bruks AB i södra Närke är kanske landets äldsta företag med svenskt ägande. Företaget har bearbetat järn sedan 1346.",
+    website: "www.skyllbergsbruk.se",
+  },
+  {
+    name: "Skyllberg Industri AB",
+    description:
+      "Skyllberg Industri är dotterbolag till Skyllbergs Bruks AB med lång lokal tradition av tråddragning, spiktillverkning och tillverkning av svetsade stålkonstruktioner. Industrin ligger i orten Kårberg, tre kilometer från Skyllberg.",
+    website: "www.skyllbergindustri.se",
+  },
+  {
+    name: "Defab",
+    description:
+      "Degerfors Förzinknings AB är dotterbolag till Skyllbergs Bruks AB sedan 1996 och en av landets största legovarmförzinkare av styckegods samt spik och annat smågods. Här finns en filial till Nils Ahlgren för försäljning av stängsel och områdesskydd.",
+    website: "www.defab.net",
+  },
+  {
+    name: "Nils Ahlgren AB",
+    description:
+      "Dotterbolag till Skyllbergs Bruks AB sedan 1982. Nils Ahlgren är grossist till bygg- och järnvaruhandeln samt heltäckande leverantör av områdesskydd.",
+    website: "www.nilsahlgren.se",
+  },
+];
 
 function createInitialSelection(categories: CatalogCategory[]): SelectionState {
   const initial: SelectionState = {};
@@ -124,6 +178,7 @@ export default function CatalogGeneratorPage() {
   const [appendixSelection, setAppendixSelection] = useState<SelectionState>(
     () => createAppendixSelection(appendixSections)
   );
+  const [pdfState, setPdfState] = useState<PdfState>({ status: "idle" });
 
   const selectedCategoryCount = useMemo(
     () => Object.values(categorySelection).filter(Boolean).length,
@@ -135,7 +190,10 @@ export default function CatalogGeneratorPage() {
     [appendixSelection]
   );
 
-  const isGenerateDisabled = selectedCategoryCount === 0;
+  const isGenerateDisabled =
+    selectedCategoryCount === 0 || pdfState.status === "loading";
+
+  const isKoncernSelected = appendixSelection[KONCERN_SECTION_ID] ?? false;
 
   function toggleCategoryGroup(category: CatalogCategory, checked: boolean) {
     setCategorySelection((prev) => {
@@ -163,6 +221,222 @@ export default function CatalogGeneratorPage() {
       ...prev,
       [id]: checked,
     }));
+  }
+
+  async function handleGeneratePdf() {
+    setPdfState({ status: "loading", message: "Genererar PDF..." });
+
+    try {
+      const [{ jsPDF }] = await Promise.all([
+        import("jspdf"),
+      ]);
+
+      const pageMarginX = 20;
+      const pageMarginTop = 30;
+      const pageMarginBottom = 20;
+      const lineHeight = 6;
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - pageMarginX * 2;
+      let cursorY = pageMarginTop;
+
+      const ensureSpace = (requiredSpace: number) => {
+        if (cursorY + requiredSpace > pageHeight - pageMarginBottom) {
+          doc.addPage();
+          cursorY = pageMarginTop;
+        }
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("Katalogöversikt", pageMarginX, cursorY);
+      cursorY += 12;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(71, 85, 105);
+      doc.text(
+        `Genererad: ${new Date().toLocaleDateString("sv-SE")}`,
+        pageMarginX,
+        cursorY
+      );
+      cursorY += 10;
+
+      doc.setTextColor(15, 23, 42);
+
+      placeholderCategories.forEach((category) => {
+        const subcategories = category.subcategories ?? [];
+        const selectedSubcategories = subcategories.filter(
+          (subcategory) => categorySelection[subcategory.id]
+        );
+        const includeWholeCategory =
+          !subcategories.length && categorySelection[category.id];
+
+        if (!includeWholeCategory && selectedSubcategories.length === 0) {
+          return;
+        }
+
+        ensureSpace(18);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text(category.name, pageMarginX, cursorY);
+        cursorY += 7;
+
+        if (category.description) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          const descriptionLines = doc.splitTextToSize(
+            category.description,
+            contentWidth
+          );
+          ensureSpace(descriptionLines.length * lineHeight + 2);
+          doc.text(descriptionLines, pageMarginX, cursorY);
+          cursorY += descriptionLines.length * lineHeight;
+        }
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+
+        if (includeWholeCategory) {
+          ensureSpace(lineHeight + 2);
+          doc.text("• Komplett kategori", pageMarginX + 2, cursorY);
+          cursorY += lineHeight;
+        }
+
+        selectedSubcategories.forEach((subcategory) => {
+          ensureSpace(lineHeight + 2);
+          doc.text(`• ${subcategory.name}`, pageMarginX + 2, cursorY);
+          cursorY += lineHeight;
+          if (subcategory.description) {
+            const subLines = doc.splitTextToSize(
+              subcategory.description,
+              contentWidth - 6
+            );
+            ensureSpace(subLines.length * lineHeight + 2);
+            doc.setTextColor(71, 85, 105);
+            doc.text(subLines, pageMarginX + 6, cursorY);
+            doc.setTextColor(15, 23, 42);
+            cursorY += subLines.length * lineHeight;
+          }
+        });
+
+        cursorY += 4;
+      });
+
+      const selectedAppendices = appendixSections.filter(
+        (section) => appendixSelection[section.id]
+      );
+
+      if (selectedAppendices.length) {
+        ensureSpace(16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("Bilagor", pageMarginX, cursorY);
+        cursorY += 7;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+
+        selectedAppendices.forEach((appendix) => {
+          ensureSpace(lineHeight + 2);
+          doc.text(`• ${appendix.title}`, pageMarginX + 2, cursorY);
+          cursorY += lineHeight;
+        });
+      }
+
+      if (isKoncernSelected) {
+        const koncernImage = await loadImageAsset("/koncern.jpg");
+
+        doc.addPage();
+        doc.setFillColor(2, 53, 98);
+        doc.rect(0, 0, pageWidth, 60, "F");
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.text("Bilaga", pageMarginX, 24);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(24);
+        doc.text("Information om koncernen", pageMarginX, 38);
+
+        doc.setTextColor(30, 41, 59);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("Koncernen", pageMarginX, 74);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        const introLines = doc.splitTextToSize(koncernIntro, contentWidth * 0.55);
+        doc.text(introLines, pageMarginX, 84);
+
+        const imageMaxWidth = contentWidth * 0.4;
+        let imageWidth = imageMaxWidth;
+        let imageHeight = (koncernImage.height / koncernImage.width) * imageWidth;
+
+        if (imageHeight > 110) {
+          imageHeight = 110;
+          imageWidth = (koncernImage.width / koncernImage.height) * imageHeight;
+        }
+        const imageX = pageWidth - pageMarginX - imageWidth;
+        const imageY = 70;
+
+        doc.addImage(
+          koncernImage.dataUrl,
+          koncernImage.format,
+          imageX,
+          imageY,
+          imageWidth,
+          imageHeight,
+          undefined,
+          "FAST"
+        );
+
+        let companyY = imageY + imageHeight + 10;
+        if (companyY < 120) {
+          companyY = 120;
+        }
+
+        koncernCompanies.forEach((company) => {
+          if (companyY > pageHeight - 40) {
+            doc.addPage();
+            companyY = pageMarginTop;
+          }
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.text(company.name, pageMarginX, companyY);
+          companyY += 6;
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          const descriptionLines = doc.splitTextToSize(
+            company.description,
+            contentWidth
+          );
+          doc.text(descriptionLines, pageMarginX, companyY);
+          companyY += descriptionLines.length * lineHeight;
+
+          doc.setTextColor(2, 53, 98);
+          doc.text(company.website, pageMarginX, companyY);
+          doc.setTextColor(15, 23, 42);
+          companyY += lineHeight + 2;
+        });
+      }
+
+      doc.save("nils-ahlgren-katalog.pdf");
+      setPdfState({
+        status: "success",
+        message: "PDF genererad. Kontakta utvecklaren för vidare anpassningar.",
+      });
+    } catch (error) {
+      console.error(error);
+      setPdfState({
+        status: "error",
+        message: "Det gick inte att generera PDF:en. Försök igen.",
+      });
+    }
   }
 
   return (
@@ -224,7 +498,12 @@ export default function CatalogGeneratorPage() {
               {appendixSections.map((section) => (
                 <label
                   key={section.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-3 transition hover:border-sky-200 hover:bg-sky-50"
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
+                    appendixSelection[section.id]
+                      ? "border-sky-300 bg-sky-50"
+                      : "border-transparent hover:border-sky-200 hover:bg-sky-50"
+                  )}
                 >
                   <input
                     type="checkbox"
@@ -264,9 +543,26 @@ export default function CatalogGeneratorPage() {
               className="w-full"
               disabled={isGenerateDisabled}
               variant={isGenerateDisabled ? "secondary" : "default"}
+              onClick={handleGeneratePdf}
             >
-              {isGenerateDisabled ? "Välj minst en kategori" : "Generera PDF (kommer snart)"}
+              {pdfState.status === "loading"
+                ? "Genererar PDF..."
+                : isGenerateDisabled
+                ? "Välj minst en kategori"
+                : "Generera PDF"}
             </Button>
+            {pdfState.status !== "idle" && (
+              <p
+                className={cn(
+                  "text-sm",
+                  pdfState.status === "error"
+                    ? "text-red-600"
+                    : "text-neutral-600"
+                )}
+              >
+                {pdfState.message}
+              </p>
+            )}
           </section>
         </aside>
       </div>
@@ -347,4 +643,60 @@ function useIndeterminateCheckbox(isIndeterminate: boolean) {
   }, [element, isIndeterminate]);
 
   return setElement;
+}
+
+interface ImageAsset {
+  dataUrl: string;
+  width: number;
+  height: number;
+  format: "PNG" | "JPEG" | "WEBP";
+}
+
+async function loadImageAsset(path: string): Promise<ImageAsset> {
+  const response = await fetch(path);
+  if (!response.ok) {
+    throw new Error(`Kunde inte läsa in bilden: ${path}`);
+  }
+
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Kunde inte konvertera bilden till data-URL"));
+      }
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Okänt fel vid läsning av bild"));
+    reader.readAsDataURL(blob);
+  });
+
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      const imageElement = document.createElement("img");
+      imageElement.onload = () => {
+        resolve({
+          width: imageElement.naturalWidth,
+          height: imageElement.naturalHeight,
+        });
+      };
+      imageElement.onerror = () => reject(new Error("Kunde inte läsa bilddimensioner"));
+      imageElement.src = dataUrl;
+    }
+  );
+
+  let format: ImageAsset["format"] = "JPEG";
+  if (blob.type.includes("png")) {
+    format = "PNG";
+  } else if (blob.type.includes("webp")) {
+    format = "WEBP";
+  }
+
+  return {
+    dataUrl,
+    width,
+    height,
+    format,
+  };
 }
