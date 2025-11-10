@@ -37,13 +37,6 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
-    href: "/katalog",
-    title: "Generera katalog",
-    description: "Generera katalog utifrån valda kategorier.",
-    emoji: "📒",
-    variant: "compact" as const,
-  },
-  {
     href: "/produktblad",
     title: "Skapa produktblad",
     description: "Generera redigerbara produktblad som PDF.",
@@ -62,6 +55,13 @@ const secondaryCards: Card[] = [
     title: "Skapa EAN",
     description: "Skapa egna EAN13-koder.",
     emoji: "🏷️",
+    variant: "compact" as const,
+  },
+    {
+    href: "",
+    title: "Generera katalog",
+    description: "Generera katalog utifrån valda kategorier.",
+    emoji: "📒",
     variant: "compact" as const,
   },
 ];
