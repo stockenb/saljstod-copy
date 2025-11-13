@@ -137,22 +137,47 @@ const PACKAGING_RANK = {
 
 type PackagingRank = (typeof PACKAGING_RANK)[keyof typeof PACKAGING_RANK];
 
-function resolvePackagingRank(articleNumber: string, packaging: string | null): PackagingRank {
-  const normalized = (packaging ?? "").normalize("NFKC").toLowerCase();
+function normalizePackagingLabel(packaging: string | null | undefined) {
+  return (packaging ?? "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("sv-SE")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (articleNumber.startsWith("B") || normalized.includes("bulk") || normalized.includes("kartong")) {
+function isBulkPackaging(articleNumber: string, normalizedPackaging: string) {
+  const normalizedArticleNumber = articleNumber.normalize("NFKC").toUpperCase();
+
+  if (normalizedArticleNumber.startsWith("B")) {
+    return true;
+  }
+
+  return (
+    normalizedPackaging.includes("bulk") || normalizedPackaging.includes("kartong")
+  );
+}
+
+function resolvePackagingRank(
+  articleNumber: string,
+  normalizedPackaging: string,
+): PackagingRank {
+  if (isBulkPackaging(articleNumber, normalizedPackaging)) {
     return PACKAGING_RANK.bulk;
   }
 
-  if (normalized.includes("sb")) {
+  if (
+    normalizedPackaging.includes("sb") ||
+    normalizedPackaging.includes("småpack") ||
+    normalizedPackaging.includes("småförpackning")
+  ) {
     return PACKAGING_RANK.sb;
   }
 
-  if (normalized.includes("paket")) {
+  if (normalizedPackaging.includes("paket")) {
     return PACKAGING_RANK.paket;
   }
 
-  if (normalized.includes("hink")) {
+  if (normalizedPackaging.includes("hink")) {
     return PACKAGING_RANK.hink;
   }
 
@@ -963,13 +988,20 @@ export default function CombinedProductSheetClientPage() {
         const tableBody = articleEntries
           .map((entry) => {
             const sizeMetrics = parseSizeMetrics(entry.size);
+            const normalizedPackaging = normalizePackagingLabel(
+              entry.packaging ?? null,
+            );
             const packagingRank = resolvePackagingRank(
               entry.articleNumber,
-              entry.packaging ?? null,
+              normalizedPackaging,
             );
             const packagingQuantity = resolvePackagingQuantity(
               entry.specMap,
               entry.packaging ?? null,
+            );
+            const isBulk = isBulkPackaging(
+              entry.articleNumber,
+              normalizedPackaging,
             );
 
             return {
@@ -977,6 +1009,7 @@ export default function CombinedProductSheetClientPage() {
               sizeMetrics,
               packagingRank,
               packagingQuantity,
+              isBulk,
             };
           })
           .sort((a, b) => {
@@ -992,6 +1025,10 @@ export default function CombinedProductSheetClientPage() {
             const lengthB = b.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
             if (lengthA !== lengthB) {
               return lengthA - lengthB;
+            }
+
+            if (a.isBulk !== b.isBulk) {
+              return a.isBulk ? 1 : -1;
             }
 
             if (a.packagingRank !== b.packagingRank) {
