@@ -102,17 +102,52 @@ async function loadArticles(): Promise<CachedArticle[]> {
   return cachePromise;
 }
 
-export async function findArticlesByPrefix(query: string): Promise<ArtikelbasArticle[]> {
-  const normalizedQuery = normalizeSearchText(query);
+type ArticleSearchOptions = {
+  excludeBulk?: boolean;
+};
+
+function getSearchMatcher(query: string) {
+  const trimmedQuery = query.trim();
+
+  if (!trimmedQuery) {
+    return null;
+  }
+
+  const hasLeadingWildcard = trimmedQuery.startsWith("%");
+  const hasTrailingWildcard = trimmedQuery.endsWith("%");
+  const strippedQuery = trimmedQuery.replace(/^%+/, "").replace(/%+$/, "");
+  const normalizedQuery = normalizeSearchText(strippedQuery);
 
   if (!normalizedQuery) {
+    return null;
+  }
+
+  if (hasLeadingWildcard && hasTrailingWildcard) {
+    return (value: string) => value.includes(normalizedQuery);
+  }
+
+  if (hasLeadingWildcard) {
+    return (value: string) => value.endsWith(normalizedQuery);
+  }
+
+  return (value: string) => value.startsWith(normalizedQuery);
+}
+
+export async function findArticles(
+  query: string,
+  options: ArticleSearchOptions = {},
+): Promise<ArtikelbasArticle[]> {
+  const matcher = getSearchMatcher(query);
+
+  if (!matcher) {
     return [];
   }
 
   const articles = await loadArticles();
 
   return articles
-    .filter((article) => article.searchTitle.startsWith(normalizedQuery))
+    .filter((article) => !options.excludeBulk || !article.articleNumber.startsWith("B"))
+    .filter((article) => matcher(article.searchTitle))
     .map(({ searchTitle, ...visible }) => visible);
 }
 
