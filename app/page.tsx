@@ -71,6 +71,7 @@ const secondaryCards: Card[] = [
     emoji: "📒",
     variant: "compact" as const,
   },
+  
 ];
 
 function CardLink({ card }: { card: Card }) {

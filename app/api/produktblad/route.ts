@@ -22,6 +22,13 @@ type NormalizedProduct = {
   specs: { key: string; value: string }[];
 };
 
+const SPEC_KEY_REPLACEMENTS: Record<string, string> = {
+  "Antal i primärförpackning": "Antal i primärförp.",
+  "Antal i sekundärförpackning": "Antal i sekundärförp.",
+  Primärförpackning: "Primärförp.",
+};
+
+
 function normalizeArray<T>(value: T | T[] | undefined): T[] {
   if (!value) {
     return [];
@@ -36,12 +43,13 @@ function normalizeSpecs(node: RawSpecNode): { key: string; value: string }[] {
   const pushSpec = (key: string, value: string) => {
     const normalizedKey = key.trim() || "Specifikation";
     const normalizedValue = value.trim();
+    const shortenedKey = SPEC_KEY_REPLACEMENTS[normalizedKey] ?? normalizedKey;
 
     if (!normalizedValue) {
       return;
     }
 
-    specs.push({ key: normalizedKey, value: normalizedValue });
+    specs.push({ key: shortenedKey, value: normalizedValue });
   };
 
   const pushFromText = (raw: string) => {

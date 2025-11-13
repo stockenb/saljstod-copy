@@ -106,6 +106,10 @@ type ArticleSearchOptions = {
   excludeBulk?: boolean;
 };
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function getSearchMatcher(query: string) {
   const trimmedQuery = query.trim();
 
@@ -113,24 +117,34 @@ function getSearchMatcher(query: string) {
     return null;
   }
 
+  const hasWildcard = trimmedQuery.includes("%");
   const hasLeadingWildcard = trimmedQuery.startsWith("%");
   const hasTrailingWildcard = trimmedQuery.endsWith("%");
-  const strippedQuery = trimmedQuery.replace(/^%+/, "").replace(/%+$/, "");
-  const normalizedQuery = normalizeSearchText(strippedQuery);
 
-  if (!normalizedQuery) {
+
+  const parts = trimmedQuery
+    .split(/%+/)
+    .map((part) => normalizeSearchText(part))
+    .filter((part) => part.length > 0);
+
+  if (parts.length === 0) {
     return null;
   }
 
-  if (hasLeadingWildcard && hasTrailingWildcard) {
-    return (value: string) => value.includes(normalizedQuery);
+if (!hasWildcard) {
+    const [firstPart] = parts;
+    return (value: string) => value.startsWith(firstPart);
   }
-
-  if (hasLeadingWildcard) {
-    return (value: string) => value.endsWith(normalizedQuery);
+ if (!hasLeadingWildcard && !hasTrailingWildcard && parts.length === 1) {
+    const [onlyPart] = parts;
+    return (value: string) => value.startsWith(onlyPart);
   }
+  const pattern = `${hasLeadingWildcard ? "" : "^"}${parts
+    .map((part) => escapeRegExp(part))
+    .join(".*")}${hasTrailingWildcard ? "" : "$"}`;
+  const matcher = new RegExp(pattern);
 
-  return (value: string) => value.startsWith(normalizedQuery);
+  return (value: string) => matcher.test(value);
 }
 
 export async function findArticles(

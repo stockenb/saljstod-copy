@@ -127,13 +127,8 @@ export default function ArtikelbasPage() {
               id="artikelbas-query"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Exempel: T-Bite PRO Träskruv TFT C4"
+              placeholder="Exempel: %T-Bite%"
             />
-            <p className="text-xs text-neutral-500">
-              Använd % som jokertecken, till exempel %skruv för att matcha
-              namn som slutar med &quot;skruv&quot;, skruv% för att matcha början eller
-              %t-bite% för att hitta text var som helst i namnet.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
