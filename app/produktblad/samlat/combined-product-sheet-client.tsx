@@ -64,6 +64,139 @@ function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
 
+function normalizeSwedishDecimal(value: string): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, "").replace(/,/g, ".");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function findFirstNumericValue(text: string | null | undefined): number | null {
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/\d+(?:[.,]\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  return normalizeSwedishDecimal(match[0]) ?? null;
+}
+
+function parseSizeMetrics(sizeText: string) {
+  const normalizedSize = sizeText.replace(/,/g, ".");
+  const match = normalizedSize.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
+
+  if (!match) {
+    const fallback = findFirstNumericValue(sizeText);
+    return {
+      thickness: fallback,
+      length: null as number | null,
+    };
+  }
+
+  const [, thicknessRaw, lengthRaw] = match;
+  const thickness = normalizeSwedishDecimal(thicknessRaw);
+  const length = normalizeSwedishDecimal(lengthRaw);
+
+  return { thickness, length };
+}
+
+function getSpecValue(
+  specMap: Map<string, string>,
+  matcher: (normalizedLabel: string) => boolean,
+): string | null {
+  for (const [label, value] of specMap.entries()) {
+    if (matcher(normalizeSpecKey(label))) {
+      return (value ?? "").trim() || null;
+    }
+  }
+
+  return null;
+}
+
+function getPackagingValue(specMap: Map<string, string>) {
+  return (
+    getSpecValue(specMap, (label) => label === "primärförpackning") ??
+    getSpecValue(specMap, (label) => label.includes("primärförpackning")) ??
+    null
+  );
+}
+
+const PACKAGING_RANK = {
+  sb: 0,
+  paket: 1,
+  hink: 2,
+  bulk: 3,
+  other: 4,
+} as const;
+
+type PackagingRank = (typeof PACKAGING_RANK)[keyof typeof PACKAGING_RANK];
+
+function resolvePackagingRank(articleNumber: string, packaging: string | null): PackagingRank {
+  const normalized = (packaging ?? "").normalize("NFKC").toLowerCase();
+
+  if (articleNumber.startsWith("B") || normalized.includes("bulk") || normalized.includes("kartong")) {
+    return PACKAGING_RANK.bulk;
+  }
+
+  if (normalized.includes("sb")) {
+    return PACKAGING_RANK.sb;
+  }
+
+  if (normalized.includes("paket")) {
+    return PACKAGING_RANK.paket;
+  }
+
+  if (normalized.includes("hink")) {
+    return PACKAGING_RANK.hink;
+  }
+
+  return PACKAGING_RANK.other;
+}
+
+const QUANTITY_SPEC_PATTERNS = [
+  "antal",
+  "förpackning",
+  "st/",
+  "st per",
+  "per förp",
+  "per fp",
+  "hink",
+  "sb",
+  "paket",
+  "bulk",
+  "kartong",
+];
+
+function resolvePackagingQuantity(
+  specMap: Map<string, string>,
+  packaging: string | null,
+): number | null {
+  const packagingQuantity = findFirstNumericValue(packaging ?? "");
+  if (packagingQuantity !== null) {
+    return packagingQuantity;
+  }
+
+  for (const [label, value] of specMap.entries()) {
+    const normalizedLabel = normalizeSpecKey(label);
+    if (!QUANTITY_SPEC_PATTERNS.some((pattern) => normalizedLabel.includes(pattern))) {
+      continue;
+    }
+
+    const numericValue = findFirstNumericValue(value);
+    if (numericValue !== null) {
+      return numericValue;
+    }
+  }
+
+  return null;
+}
+
 function tokenizeTitle(title: string) {
   return title
     .split(/\s+/)
@@ -731,11 +864,13 @@ export default function CombinedProductSheetClientPage() {
         }
         const sizeTokens = tokens.slice(prefixLength, endIndex);
         const sizeText = sizeTokens.join(" ").trim();
+        const packaging = getPackagingValue(entry.specMap);
 
         return {
           articleNumber: entry.articleNumber,
           size: displayValue(sizeText || entry.originalTitle),
           specMap: entry.specMap,
+          packaging,
         };
       });
 
@@ -825,12 +960,74 @@ export default function CombinedProductSheetClientPage() {
         currentY += 6;
 
         const headRow = ["Artikelnummer", "Storlek", ...filteredSpecLabels];
-        const tableBody = articleEntries.map((entry) => {
-          const rowValues = filteredSpecLabels.map((label) =>
-            displayValue(entry.specMap.get(label)),
-          );
-          return [displayValue(entry.articleNumber), entry.size, ...rowValues];
-        });
+        const tableBody = articleEntries
+          .map((entry) => {
+            const sizeMetrics = parseSizeMetrics(entry.size);
+            const packagingRank = resolvePackagingRank(
+              entry.articleNumber,
+              entry.packaging ?? null,
+            );
+            const packagingQuantity = resolvePackagingQuantity(
+              entry.specMap,
+              entry.packaging ?? null,
+            );
+
+            return {
+              ...entry,
+              sizeMetrics,
+              packagingRank,
+              packagingQuantity,
+            };
+          })
+          .sort((a, b) => {
+            const thicknessA =
+              a.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
+            const thicknessB =
+              b.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
+            if (thicknessA !== thicknessB) {
+              return thicknessA - thicknessB;
+            }
+
+            const lengthA = a.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
+            const lengthB = b.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
+            if (lengthA !== lengthB) {
+              return lengthA - lengthB;
+            }
+
+            if (a.packagingRank !== b.packagingRank) {
+              return a.packagingRank - b.packagingRank;
+            }
+
+            const quantityA = a.packagingQuantity ?? Number.POSITIVE_INFINITY;
+            const quantityB = b.packagingQuantity ?? Number.POSITIVE_INFINITY;
+            if (quantityA !== quantityB) {
+              return quantityA - quantityB;
+            }
+
+            const packagingCompare = (a.packaging ?? "").localeCompare(
+              b.packaging ?? "",
+              "sv-SE",
+              { sensitivity: "accent" },
+            );
+            if (packagingCompare !== 0) {
+              return packagingCompare;
+            }
+
+            return a.articleNumber.localeCompare(b.articleNumber, "sv-SE", {
+              numeric: true,
+              sensitivity: "base",
+            });
+          })
+          .map((entry) => {
+            const rowValues = filteredSpecLabels.map((label) =>
+              displayValue(entry.specMap.get(label)),
+            );
+            return [
+              displayValue(entry.articleNumber),
+              entry.size,
+              ...rowValues,
+            ];
+          });
 
         autoTable(doc, {
           startY: currentY,
