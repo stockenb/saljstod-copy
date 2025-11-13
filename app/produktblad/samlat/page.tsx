@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -326,6 +327,8 @@ function normalizeArticleNumbers(raw: string): string[] {
 }
 
 export default function CombinedProductSheetPage() {
+  const searchParams = useSearchParams();
+  const artiklarParam = searchParams.get("artiklar");
   const [articleInput, setArticleInput] = useState("");
   const [products, setProducts] = useState<ProductData[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle", message: "" });
@@ -359,13 +362,10 @@ export default function CombinedProductSheetPage() {
     }
   }, [pdfState.status]);
 
-  const handleFetchProducts = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const numbers = Array.from(new Set(normalizeArticleNumbers(articleInput)));
-
+  const fetchProductsForNumbers = useCallback(async (numbers: string[]) => {
     if (numbers.length === 0) {
       setFetchState({ status: "error", message: "Ange minst ett artikelnummer." });
+      setProducts([]);
       return;
     }
 
@@ -415,7 +415,30 @@ export default function CombinedProductSheetPage() {
       console.error(error);
       setFetchState({ status: "error", message: "Ett oväntat fel inträffade." });
     }
+  }, []);
+
+  const handleFetchProducts = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const numbers = Array.from(new Set(normalizeArticleNumbers(articleInput)));
+
+    await fetchProductsForNumbers(numbers);
   };
+
+  useEffect(() => {
+    if (!artiklarParam) {
+      return;
+    }
+
+    const numbers = Array.from(new Set(normalizeArticleNumbers(artiklarParam)));
+
+    if (numbers.length === 0) {
+      return;
+    }
+
+    setArticleInput(numbers.join(", "));
+    void fetchProductsForNumbers(numbers);
+  }, [artiklarParam, fetchProductsForNumbers]);
 
   const updateProductField = (index: number, field: keyof ProductData, value: string) => {
     setProducts((previous) => {
