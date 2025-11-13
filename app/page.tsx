@@ -51,6 +51,13 @@ const secondaryCards: Card[] = [
     variant: "compact" as const,
   },
   {
+    href: "/artikelbas",
+    title: "Artikelbas",
+    description: "Sök produktfamiljer och skapa produktblad automatiskt.",
+    emoji: "🗂️",
+    variant: "compact" as const,
+  },
+  {
     href: "/ean",
     title: "Skapa EAN",
     description: "Skapa egna EAN13-koder.",
