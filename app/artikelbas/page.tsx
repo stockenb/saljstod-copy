@@ -9,6 +9,10 @@ import {
   type PackagingFilterValue,
   PACKAGING_FILTER_VALUES,
 } from "@/lib/artikelbas-filters";
+import {
+  fetchCombinedProductData,
+  generateCombinedProductSheet,
+} from "@/lib/produktblad/combined-product-sheet";
 
 const PACKAGING_FILTER_LABELS: Record<PackagingFilterValue, string> = {
   "small-pack": "Småpack",
@@ -29,6 +33,12 @@ type FamilyArticle = {
 };
 
 type FetchStatus = "idle" | "loading" | "success" | "error";
+type PdfStatus = "idle" | "loading" | "success" | "error";
+
+type PdfState = {
+  status: PdfStatus;
+  message: string;
+};
 
 export default function ArtikelbasPage() {
   const [query, setQuery] = useState("");
@@ -37,6 +47,7 @@ export default function ArtikelbasPage() {
   const [articles, setArticles] = useState<FamilyArticle[]>([]);
   const [status, setStatus] = useState<FetchStatus>("idle");
   const [message, setMessage] = useState("");
+  const [pdfState, setPdfState] = useState<PdfState>({ status: "idle", message: "" });
   const router = useRouter();
 
   const messageClasses = useMemo(() => {
@@ -51,6 +62,19 @@ export default function ArtikelbasPage() {
         return "text-sm text-neutral-500";
     }
   }, [status]);
+
+  const pdfMessageClasses = useMemo(() => {
+    switch (pdfState.status) {
+      case "error":
+        return "text-sm text-danger";
+      case "success":
+        return "text-sm text-emerald-600";
+      case "loading":
+        return "text-sm text-neutral-500";
+      default:
+        return "text-sm text-neutral-500";
+    }
+  }, [pdfState.status]);
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -92,6 +116,7 @@ export default function ArtikelbasPage() {
 
       const data = (await response.json()) as { articles: FamilyArticle[] };
       setArticles(data.articles);
+      setPdfState({ status: "idle", message: "" });
 
       if (data.articles.length === 0) {
         setStatus("success");
@@ -109,6 +134,7 @@ export default function ArtikelbasPage() {
           ? error.message
           : "Ett oväntat fel inträffade.",
       );
+      setPdfState({ status: "idle", message: "" });
     }
   };
 
@@ -122,6 +148,53 @@ export default function ArtikelbasPage() {
     params.set("artiklar", articleNumbers.join(","));
 
     router.push(`/produktblad/samlat?${params.toString()}`);
+  };
+
+  const handleGeneratePdf = async () => {
+    if (articles.length === 0) {
+      setPdfState({
+        status: "error",
+        message: "Sök fram artiklar innan du genererar PDF.",
+      });
+      return;
+    }
+
+    setPdfState({ status: "loading", message: "Genererar PDF..." });
+
+    try {
+      const articleNumbers = Array.from(
+        new Set(articles.map((article) => article.articleNumber)),
+      );
+      const { products, errors } = await fetchCombinedProductData(articleNumbers);
+
+      if (products.length === 0) {
+        const errorMessage =
+          errors.length > 0
+            ? errors
+                .map((entry) => `Artikel ${entry.articleNumber}: ${entry.message}`)
+                .join("\n")
+            : "Inga artiklar kunde hämtas.";
+        setPdfState({ status: "error", message: errorMessage });
+        return;
+      }
+
+      if (errors.length > 0) {
+        const errorMessage = errors
+          .map((entry) => `Artikel ${entry.articleNumber}: ${entry.message}`)
+          .join("\n");
+        setPdfState({
+          status: "error",
+          message: `Kunde inte hämta vissa artiklar:\n${errorMessage}`,
+        });
+        return;
+      }
+
+      await generateCombinedProductSheet(products);
+      setPdfState({ status: "success", message: "PDF genererad." });
+    } catch (error) {
+      console.error(error);
+      setPdfState({ status: "error", message: "Kunde inte generera PDF." });
+    }
   };
 
   return (
@@ -234,15 +307,28 @@ export default function ArtikelbasPage() {
                 : "Alla artiklar som matchar din sökning."}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleCreateProductSheet}
-            disabled={articles.length === 0}
-            className="w-full sm:w-auto"
-          >
-            Skapa samlat produktblad
-          </Button>
+          <div className="flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+            {pdfState.message ? (
+              <p className={pdfMessageClasses}>{pdfState.message}</p>
+            ) : null}
+            <Button
+              type="button"
+              onClick={handleGeneratePdf}
+              disabled={articles.length === 0 || pdfState.status === "loading"}
+              className="w-full sm:w-auto"
+            >
+              Skapa samlad PDF
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCreateProductSheet}
+              disabled={articles.length === 0}
+              className="w-full sm:w-auto"
+            >
+              Skapa samlat produktblad
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-2">
