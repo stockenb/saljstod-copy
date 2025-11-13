@@ -16,6 +16,7 @@ type FetchStatus = "idle" | "loading" | "success" | "error";
 
 export default function ArtikelbasPage() {
   const [query, setQuery] = useState("");
+  const [excludeBulk, setExcludeBulk] = useState(false);
   const [articles, setArticles] = useState<FamilyArticle[]>([]);
   const [status, setStatus] = useState<FetchStatus>("idle");
   const [message, setMessage] = useState("");
@@ -50,12 +51,15 @@ export default function ArtikelbasPage() {
     setMessage("Söker i artikelbasen...");
 
     try {
-      const response = await fetch(
-        `/api/artikelbas/family?q=${encodeURIComponent(trimmed)}`,
-        {
-          method: "GET",
-        },
-      );
+      const params = new URLSearchParams();
+      params.set("q", trimmed);
+      if (excludeBulk) {
+        params.set("excludeBulk", "1");
+      }
+
+      const response = await fetch(`/api/artikelbas/family?${params.toString()}`, {
+        method: "GET",
+      });
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as
@@ -126,8 +130,26 @@ export default function ArtikelbasPage() {
               placeholder="Exempel: T-Bite PRO Träskruv TFT C4"
             />
             <p className="text-xs text-neutral-500">
-              Ange början av produktnamnet för familjen du vill hitta.
+              Använd % som jokertecken, till exempel %skruv för att matcha
+              namn som slutar med &quot;skruv&quot;, skruv% för att matcha början eller
+              %t-bite% för att hitta text var som helst i namnet.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="artikelbas-exclude-bulk"
+              type="checkbox"
+              className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+              checked={excludeBulk}
+              onChange={(event) => setExcludeBulk(event.target.checked)}
+            />
+            <label
+              htmlFor="artikelbas-exclude-bulk"
+              className="text-sm text-neutral-700"
+            >
+              Exkludera bulkartiklar (artikelnummer som börjar med B)
+            </label>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
