@@ -153,25 +153,9 @@ export default function ArtikelbasPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <input
-                id="artikelbas-exclude-bulk"
-                type="checkbox"
-                className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-                checked={excludeBulk}
-                onChange={(event) => setExcludeBulk(event.target.checked)}
-              />
-              <label
-                htmlFor="artikelbas-exclude-bulk"
-                className="text-sm text-neutral-700"
-              >
-                Exkludera bulkartiklar (artikelnummer som börjar med B)
-              </label>
-            </div>
-
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium text-neutral-700">
-                Filtrera på förpackning
+                Ta endast med följande:
               </legend>
               <div className="flex flex-wrap gap-3">
                 {PACKAGING_FILTER_OPTIONS.map((option) => {
