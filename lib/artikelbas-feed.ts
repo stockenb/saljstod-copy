@@ -2,6 +2,8 @@ import path from "path";
 import { readFile } from "fs/promises";
 import { XMLParser } from "fast-xml-parser";
 
+import type { PackagingFilterValue } from "./artikelbas-filters";
+
 export type ArtikelbasArticle = {
   articleNumber: string;
   title: string;
@@ -10,6 +12,7 @@ export type ArtikelbasArticle = {
 
 type CachedArticle = ArtikelbasArticle & {
   searchTitle: string;
+  primaryPackaging: string | null;
 };
 
 const FEED_PATH = path.join(process.cwd(), "app", "artikelbas", "feed.xml");
@@ -41,7 +44,61 @@ function normalizeSearchText(value: string): string {
     .toLocaleLowerCase("sv-SE");
 }
 
-type RawItem = Record<string, unknown>;
+function normalizePackaging(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value.normalize("NFKC").toLocaleLowerCase("sv-SE");
+}
+
+function getSpecifications(item: RawItem): string[] {
+  const rawSpecifications = item?.specifications;
+
+  if (!rawSpecifications) {
+    return [];
+  }
+
+  if (Array.isArray(rawSpecifications)) {
+    return rawSpecifications.flatMap((specification) =>
+      normalizeArray((specification as RawSpecifications)?.specification).map((value) =>
+        String(value),
+      ),
+    );
+  }
+
+  return normalizeArray(rawSpecifications.specification).map((value) =>
+    String(value),
+  );
+}
+
+function extractPrimaryPackaging(specifications: string[]): string | null {
+  const packagingEntry = specifications.find((specification) =>
+    /^Primärförpackning:/i.test(specification),
+  );
+
+  if (!packagingEntry) {
+    return null;
+  }
+
+  const [, value] = packagingEntry.split(/:\s*/, 2);
+  return value ? value.trim() : null;
+}
+
+const PACKAGING_FILTER_TARGETS: Record<
+  Exclude<PackagingFilterValue, "bulk">,
+  string
+> = {
+  "small-pack": normalizePackaging("SB förpackning") ?? "sb förpackning",
+  bucket: normalizePackaging("Hink") ?? "hink",
+  package: normalizePackaging("Paket") ?? "paket",
+};
+
+type RawSpecifications = { specification?: unknown | unknown[] };
+
+type RawItem = Record<string, unknown> & {
+  specifications?: RawSpecifications | RawSpecifications[];
+};
 
 type ParsedFeed = {
   rss?: {
@@ -72,6 +129,8 @@ async function loadArticles(): Promise<CachedArticle[]> {
           const articleNumber = item?.id;
           const title = item?.title;
           const link = item?.link;
+          const specifications = getSpecifications(item);
+          const primaryPackaging = extractPrimaryPackaging(specifications);
 
           if (
             articleNumber === undefined ||
@@ -88,6 +147,7 @@ async function loadArticles(): Promise<CachedArticle[]> {
             title: normalizedTitle,
             link: String(link),
             searchTitle: normalizeSearchText(normalizedTitle),
+            primaryPackaging,
           } satisfies CachedArticle;
         })
         .filter((article): article is CachedArticle => article !== null);
@@ -104,6 +164,7 @@ async function loadArticles(): Promise<CachedArticle[]> {
 
 type ArticleSearchOptions = {
   excludeBulk?: boolean;
+  packagingFilters?: PackagingFilterValue[];
 };
 
 function escapeRegExp(value: string): string {
@@ -147,6 +208,25 @@ if (!hasWildcard) {
   return (value: string) => matcher.test(value);
 }
 
+function matchesPackagingFilter(
+  article: CachedArticle,
+  filter: PackagingFilterValue,
+): boolean {
+  const normalizedPackaging = normalizePackaging(article.primaryPackaging);
+
+  if (filter === "bulk") {
+    return article.articleNumber.startsWith("B");
+  }
+
+  const expected = PACKAGING_FILTER_TARGETS[filter];
+
+  if (!expected || !normalizedPackaging) {
+    return false;
+  }
+
+  return normalizedPackaging === expected;
+}
+
 export async function findArticles(
   query: string,
   options: ArticleSearchOptions = {},
@@ -158,14 +238,24 @@ export async function findArticles(
   }
 
   const articles = await loadArticles();
+  const packagingFilters = options.packagingFilters
+    ? Array.from(new Set(options.packagingFilters))
+    : [];
 
   return articles
-    .filter((article) => !options.excludeBulk || !article.articleNumber.startsWith("B"))
+    .filter(
+      (article) => !options.excludeBulk || !article.articleNumber.startsWith("B"),
+    )
+    .filter(
+      (article) =>
+        packagingFilters.length === 0 ||
+        packagingFilters.some((filter) => matchesPackagingFilter(article, filter)),
+    )
     .filter((article) => matcher(article.searchTitle))
-    .map(({ searchTitle, ...visible }) => visible);
+    .map(({ searchTitle, primaryPackaging, ...visible }) => visible);
 }
 
 export async function getAllArticles(): Promise<ArtikelbasArticle[]> {
   const articles = await loadArticles();
-  return articles.map(({ searchTitle, ...visible }) => visible);
+  return articles.map(({ searchTitle, primaryPackaging, ...visible }) => visible);
 }

@@ -5,6 +5,22 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  type PackagingFilterValue,
+  PACKAGING_FILTER_VALUES,
+} from "@/lib/artikelbas-filters";
+
+const PACKAGING_FILTER_LABELS: Record<PackagingFilterValue, string> = {
+  "small-pack": "Småpack",
+  bucket: "Hink",
+  package: "Paket",
+  bulk: "Bulk",
+};
+
+const PACKAGING_FILTER_OPTIONS = PACKAGING_FILTER_VALUES.map((value) => ({
+  value,
+  label: PACKAGING_FILTER_LABELS[value],
+}));
 
 type FamilyArticle = {
   articleNumber: string;
@@ -17,6 +33,7 @@ type FetchStatus = "idle" | "loading" | "success" | "error";
 export default function ArtikelbasPage() {
   const [query, setQuery] = useState("");
   const [excludeBulk, setExcludeBulk] = useState(false);
+  const [packagingFilters, setPackagingFilters] = useState<PackagingFilterValue[]>([]);
   const [articles, setArticles] = useState<FamilyArticle[]>([]);
   const [status, setStatus] = useState<FetchStatus>("idle");
   const [message, setMessage] = useState("");
@@ -56,6 +73,11 @@ export default function ArtikelbasPage() {
       if (excludeBulk) {
         params.set("excludeBulk", "1");
       }
+      PACKAGING_FILTER_VALUES.forEach((filter) => {
+        if (packagingFilters.includes(filter)) {
+          params.append("packaging", filter);
+        }
+      });
 
       const response = await fetch(`/api/artikelbas/family?${params.toString()}`, {
         method: "GET",
@@ -131,20 +153,64 @@ export default function ArtikelbasPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              id="artikelbas-exclude-bulk"
-              type="checkbox"
-              className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-              checked={excludeBulk}
-              onChange={(event) => setExcludeBulk(event.target.checked)}
-            />
-            <label
-              htmlFor="artikelbas-exclude-bulk"
-              className="text-sm text-neutral-700"
-            >
-              Exkludera bulkartiklar (artikelnummer som börjar med B)
-            </label>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <input
+                id="artikelbas-exclude-bulk"
+                type="checkbox"
+                className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+                checked={excludeBulk}
+                onChange={(event) => setExcludeBulk(event.target.checked)}
+              />
+              <label
+                htmlFor="artikelbas-exclude-bulk"
+                className="text-sm text-neutral-700"
+              >
+                Exkludera bulkartiklar (artikelnummer som börjar med B)
+              </label>
+            </div>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-neutral-700">
+                Filtrera på förpackning
+              </legend>
+              <div className="flex flex-wrap gap-3">
+                {PACKAGING_FILTER_OPTIONS.map((option) => {
+                  const inputId = `artikelbas-packaging-${option.value}`;
+                  const isChecked = packagingFilters.includes(option.value);
+
+                  return (
+                    <label
+                      key={option.value}
+                      htmlFor={inputId}
+                      className="flex items-center gap-2 text-sm text-neutral-700"
+                    >
+                      <input
+                        id={inputId}
+                        type="checkbox"
+                        className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+                        checked={isChecked}
+                        onChange={(event) => {
+                          const { checked } = event.target;
+                          setPackagingFilters((current) => {
+                            if (checked) {
+                              if (current.includes(option.value)) {
+                                return current;
+                              }
+
+                              return [...current, option.value];
+                            }
+
+                            return current.filter((value) => value !== option.value);
+                          });
+                        }}
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
