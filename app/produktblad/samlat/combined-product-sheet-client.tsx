@@ -64,6 +64,54 @@ function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
 
+function normalizePackagingLabel(value: string | undefined | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .normalize("NFKC")
+    .toLocaleLowerCase("sv-SE")
+    .replace(/[-_/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized || null;
+}
+
+const PACKAGING_PRIORITIES: Record<string, number> = {
+  "sb förpackning": 0,
+  paket: 1,
+  hink: 2,
+};
+
+const UNKNOWN_PACKAGING_PRIORITY = 3;
+const BULK_PACKAGING_PRIORITY = 4;
+
+function getPackagingPriority(articleNumber: string, packaging: string | null): number {
+  if (/^b/i.test(articleNumber)) {
+    return BULK_PACKAGING_PRIORITY;
+  }
+
+  if (!packaging) {
+    return UNKNOWN_PACKAGING_PRIORITY;
+  }
+
+  return PACKAGING_PRIORITIES[packaging] ?? UNKNOWN_PACKAGING_PRIORITY;
+}
+
+function getSizeSortValue(size: string): number {
+  const normalized = size.replace(/\s+/g, "");
+  const match = normalized.match(/\d+(?:[.,]\d+)?/);
+
+  if (!match) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const value = Number.parseFloat(match[0].replace(",", "."));
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+}
+
 function tokenizeTitle(title: string) {
   return title
     .split(/\s+/)
@@ -731,10 +779,18 @@ export default function CombinedProductSheetClientPage() {
         }
         const sizeTokens = tokens.slice(prefixLength, endIndex);
         const sizeText = sizeTokens.join(" ").trim();
+        const normalizedPackaging = normalizePackagingLabel(
+          entry.specMap.get("Primärförp."),
+        );
 
         return {
           articleNumber: entry.articleNumber,
           size: displayValue(sizeText || entry.originalTitle),
+          sizeSortValue: getSizeSortValue(sizeText || entry.originalTitle),
+          packagingPriority: getPackagingPriority(
+            entry.articleNumber,
+            normalizedPackaging,
+          ),
           specMap: entry.specMap,
         };
       });
@@ -825,7 +881,18 @@ export default function CombinedProductSheetClientPage() {
         currentY += 6;
 
         const headRow = ["Artikelnummer", "Storlek", ...filteredSpecLabels];
-        const tableBody = articleEntries.map((entry) => {
+        const sortedArticleEntries = [...articleEntries].sort((a, b) => {
+          if (a.sizeSortValue !== b.sizeSortValue) {
+            return a.sizeSortValue - b.sizeSortValue;
+          }
+
+          if (a.packagingPriority !== b.packagingPriority) {
+            return a.packagingPriority - b.packagingPriority;
+          }
+
+          return a.articleNumber.localeCompare(b.articleNumber, "sv-SE");
+        });
+        const tableBody = sortedArticleEntries.map((entry) => {
           const rowValues = filteredSpecLabels.map((label) =>
             displayValue(entry.specMap.get(label)),
           );
