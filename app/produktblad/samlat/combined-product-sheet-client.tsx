@@ -6,6 +6,7 @@ import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
 
 type Specification = {
   key: string;
@@ -676,12 +677,13 @@ export default function CombinedProductSheetClientPage() {
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
-      doc.text(firstProduct?.title || "Samlat produktblad", marginX + 8, headerTop + 12);
+      const pdfTitle = sanitizePdfText(firstProduct?.title || "Samlat produktblad");
+      doc.text(pdfTitle, marginX + 8, headerTop + 12);
 
       doc.setFont(baseFont, normalStyle);
       doc.setFontSize(11);
       doc.setTextColor(226, 232, 240);
-      doc.text("Samlat produktblad", marginX + 8, headerTop + 20);
+      doc.text(sanitizePdfText("Samlat produktblad"), marginX + 8, headerTop + 20);
 
       let currentY = headerTop + 34;
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
@@ -767,7 +769,7 @@ export default function CombinedProductSheetClientPage() {
         const paragraphs = sharedDescription.split(/\r?\n\s*\r?\n/);
 
         for (const [index, paragraph] of paragraphs.entries()) {
-          const normalizedParagraph = paragraph.replace(/\r?\n/g, " ").trim();
+          const normalizedParagraph = sanitizePdfText(paragraph.replace(/\r?\n/g, " ").trim());
 
           if (index > 0) {
             textBaseline += lineHeight;
@@ -786,17 +788,19 @@ export default function CombinedProductSheetClientPage() {
             }
 
             const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-            const lineWidth = doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
+            const safeLine = sanitizePdfText(line);
+            const lineWidth =
+              doc.getStringUnitWidth(safeLine) * (doc.getFontSize() / doc.internal.scaleFactor);
 
             if (lineWidth > maxWidth) {
-              const forcedLines = doc.splitTextToSize(line, maxWidth);
+              const forcedLines = doc.splitTextToSize(safeLine, maxWidth).map(sanitizePdfText);
               for (const forcedLine of forcedLines) {
                 doc.text(forcedLine, marginX, textBaseline);
                 lastLineBaseline = textBaseline;
                 textBaseline += lineHeight;
               }
             } else {
-              doc.text(line, marginX, textBaseline);
+              doc.text(safeLine, marginX, textBaseline);
               lastLineBaseline = textBaseline;
               textBaseline += lineHeight;
             }
@@ -805,27 +809,30 @@ export default function CombinedProductSheetClientPage() {
           for (const word of words) {
             const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
             const candidate = currentLine ? `${currentLine} ${word}` : word;
+            const safeCandidate = sanitizePdfText(candidate);
             const candidateWidth =
-              doc.getStringUnitWidth(candidate) * (doc.getFontSize() / doc.internal.scaleFactor);
+              doc.getStringUnitWidth(safeCandidate) * (doc.getFontSize() / doc.internal.scaleFactor);
 
             if (candidateWidth <= maxWidth) {
-              currentLine = candidate;
+              currentLine = safeCandidate;
             } else {
               writeLine(currentLine);
               currentLine = "";
 
               const updatedMaxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-              const wordWidth = doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
+              const safeWord = sanitizePdfText(word);
+              const wordWidth =
+                doc.getStringUnitWidth(safeWord) * (doc.getFontSize() / doc.internal.scaleFactor);
 
               if (wordWidth > updatedMaxWidth) {
-                const forcedLines = doc.splitTextToSize(word, updatedMaxWidth);
+                const forcedLines = doc.splitTextToSize(safeWord, updatedMaxWidth).map(sanitizePdfText);
                 for (const forcedLine of forcedLines) {
                   doc.text(forcedLine, marginX, textBaseline);
                   lastLineBaseline = textBaseline;
                   textBaseline += lineHeight;
                 }
               } else {
-                currentLine = word;
+                currentLine = safeWord;
               }
             }
           }
@@ -846,8 +853,8 @@ export default function CombinedProductSheetClientPage() {
       currentY = layoutBottom + 12;
 
       const displayValue = (value?: string) => {
-        const trimmed = (value ?? "").trim();
-        return trimmed || "-";
+        const trimmed = sanitizePdfText((value ?? "").trim());
+        return trimmed || sanitizePdfText("-");
       };
 
       const specOrder: string[] = [];
@@ -912,7 +919,7 @@ export default function CombinedProductSheetClientPage() {
       });
 
       const sharedSpecs = sharedSpecLabels.map((label) => ({
-        label,
+        label: sanitizePdfText(label),
         value: displayValue(rawEntries[0]?.specMap.get(label)),
       }));
 
@@ -939,7 +946,7 @@ export default function CombinedProductSheetClientPage() {
           startY: currentY,
           margin: { left: marginX, right: marginX },
           head: [["Specifikation", "Värde"]],
-          body: sharedSpecs.map((spec) => [spec.label, spec.value]),
+          body: sharedSpecs.map((spec) => sanitizePdfTextArray([spec.label, spec.value])),
           styles: {
             font: baseFont,
             fontStyle: normalStyle,
@@ -984,7 +991,11 @@ export default function CombinedProductSheetClientPage() {
         doc.text("Artiklar", marginX, currentY);
         currentY += 6;
 
-        const headRow = ["Artikelnummer", "Storlek", ...filteredSpecLabels];
+        const headRow = sanitizePdfTextArray([
+          "Artikelnummer",
+          "Storlek",
+          ...filteredSpecLabels.map((label) => sanitizePdfText(label)),
+        ]);
         const tableBody = articleEntries
           .map((entry) => {
             const sizeMetrics = parseSizeMetrics(entry.size);
@@ -1070,7 +1081,7 @@ export default function CombinedProductSheetClientPage() {
           startY: currentY,
           margin: { left: marginX, right: marginX },
           head: [headRow],
-          body: tableBody,
+          body: tableBody.map((row) => sanitizePdfTextArray(row)),
           styles: {
             font: baseFont,
             fontStyle: normalStyle,
@@ -1117,7 +1128,7 @@ export default function CombinedProductSheetClientPage() {
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
       const footerY = pageHeight - 16;
-      contactDetails.forEach((line, index) => {
+      sanitizePdfTextArray(contactDetails).forEach((line, index) => {
         doc.text(line, marginX, footerY + index * 5);
       });
 

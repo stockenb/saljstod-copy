@@ -5,6 +5,7 @@ import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
 
 type Specification = {
   key: string;
@@ -481,13 +482,15 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(19);
       doc.setTextColor(255, 255, 255);
-      doc.text(form.title || "Produktblad", marginX + 8, headerTop + 12);
+      const pdfTitle = sanitizePdfText(form.title || "Produktblad");
+      doc.text(pdfTitle, marginX + 8, headerTop + 12);
 
       if (form.articleNumber) {
         doc.setFont(baseFont, normalStyle);
         doc.setFontSize(11);
         doc.setTextColor(226, 232, 240);
-        doc.text(`Artikelnummer: ${form.articleNumber}`, marginX + 8, headerTop + 20);
+        const articleLabel = sanitizePdfText(`Artikelnummer: ${form.articleNumber}`);
+        doc.text(articleLabel, marginX + 8, headerTop + 20);
       }
 
       let currentY = headerTop + 34;
@@ -542,7 +545,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
         null;
 
       if (form.link) {
-        const buttonLabel = "Öppna produktsidan";
+        const buttonLabel = sanitizePdfText("Öppna produktsidan");
         doc.setFont(baseFont, boldStyle);
         const labelWidth = doc.getStringUnitWidth(buttonLabel) * (doc.getFontSize() / doc.internal.scaleFactor);
         const paddingX = 6;
@@ -600,7 +603,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
         const paragraphs = form.description.split(/\r?\n\s*\r?\n/);
 
         for (const [index, paragraph] of paragraphs.entries()) {
-          const normalizedParagraph = paragraph.replace(/\r?\n/g, " ").trim();
+          const normalizedParagraph = sanitizePdfText(paragraph.replace(/\r?\n/g, " ").trim());
 
           if (index > 0) {
             textBaseline += lineHeight;
@@ -619,17 +622,19 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
             }
 
             const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-            const lineWidth = doc.getStringUnitWidth(line) * (doc.getFontSize() / doc.internal.scaleFactor);
+            const safeLine = sanitizePdfText(line);
+            const lineWidth =
+              doc.getStringUnitWidth(safeLine) * (doc.getFontSize() / doc.internal.scaleFactor);
 
             if (lineWidth > maxWidth) {
-              const forcedLines = doc.splitTextToSize(line, maxWidth);
+              const forcedLines = doc.splitTextToSize(safeLine, maxWidth).map(sanitizePdfText);
               for (const forcedLine of forcedLines) {
                 doc.text(forcedLine, marginX, textBaseline);
                 lastLineBaseline = textBaseline;
                 textBaseline += lineHeight;
               }
             } else {
-              doc.text(line, marginX, textBaseline);
+              doc.text(safeLine, marginX, textBaseline);
               lastLineBaseline = textBaseline;
               textBaseline += lineHeight;
             }
@@ -638,27 +643,30 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
           for (const word of words) {
             const maxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
             const candidate = currentLine ? `${currentLine} ${word}` : word;
+            const safeCandidate = sanitizePdfText(candidate);
             const candidateWidth =
-              doc.getStringUnitWidth(candidate) * (doc.getFontSize() / doc.internal.scaleFactor);
+              doc.getStringUnitWidth(safeCandidate) * (doc.getFontSize() / doc.internal.scaleFactor);
 
             if (candidateWidth <= maxWidth) {
-              currentLine = candidate;
+              currentLine = safeCandidate;
             } else {
               writeLine(currentLine);
               currentLine = "";
 
               const updatedMaxWidth = imageLayout && textBaseline < columnLimitY ? columnWidth : contentWidth;
-              const wordWidth = doc.getStringUnitWidth(word) * (doc.getFontSize() / doc.internal.scaleFactor);
+              const safeWord = sanitizePdfText(word);
+              const wordWidth =
+                doc.getStringUnitWidth(safeWord) * (doc.getFontSize() / doc.internal.scaleFactor);
 
               if (wordWidth > updatedMaxWidth) {
-                const forcedLines = doc.splitTextToSize(word, updatedMaxWidth);
+                const forcedLines = doc.splitTextToSize(safeWord, updatedMaxWidth).map(sanitizePdfText);
                 for (const forcedLine of forcedLines) {
                   doc.text(forcedLine, marginX, textBaseline);
                   lastLineBaseline = textBaseline;
                   textBaseline += lineHeight;
                 }
               } else {
-                currentLine = word;
+                currentLine = safeWord;
               }
             }
           }
@@ -679,7 +687,10 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       const body = form.specs
         .filter((spec) => spec.key.trim() || spec.value.trim())
-        .map((spec) => [spec.key.trim() || "Specifikation", spec.value.trim()]);
+        .map((spec) => [
+          sanitizePdfText(spec.key.trim() || "Specifikation"),
+          sanitizePdfText(spec.value.trim()),
+        ]);
 
       if (body.length > 0) {
         if (currentY + 40 > pageHeight - 30) {
@@ -740,7 +751,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
       const footerY = pageHeight - 16;
-      contactDetails.forEach((line, index) => {
+      sanitizePdfTextArray(contactDetails).forEach((line, index) => {
         doc.text(line, marginX, footerY + index * 5);
       });
 
