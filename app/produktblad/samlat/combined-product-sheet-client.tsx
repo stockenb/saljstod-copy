@@ -337,6 +337,20 @@ function analyzeProductTitles(products: ProductData[]) {
     }
   }
 
+  while (baseTokens.length > 0) {
+    const lastToken = baseTokens[baseTokens.length - 1];
+    if (lastToken.toLocaleLowerCase("sv-SE") !== "mm") {
+      break;
+    }
+
+    const previousToken = baseTokens[baseTokens.length - 2];
+    if (previousToken && /\d/.test(previousToken)) {
+      break;
+    }
+
+    baseTokens.pop();
+  }
+
   const combinedTitle = baseTokens.join(" ").trim() || fallbackTitle;
 
   return { combinedTitle, prefixTokens, suffixTokens };
