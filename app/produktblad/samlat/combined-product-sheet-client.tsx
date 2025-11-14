@@ -61,6 +61,39 @@ const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
 const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
 
+const MEASUREMENT_LETTERS = new Set([
+  "x",
+  "X",
+  "Ø",
+  "ø",
+  "Φ",
+  "φ",
+  "R",
+  "r",
+  "M",
+  "m",
+]);
+
+function isMeasurementToken(token: string | undefined) {
+  if (!token) {
+    return false;
+  }
+
+  const normalized = token.replace(/\s+/g, "");
+
+  if (!/\d/.test(normalized)) {
+    return false;
+  }
+
+  const lettersOnly = normalized.replace(/[^\p{L}]/gu, "");
+
+  if (lettersOnly.length === 0) {
+    return true;
+  }
+
+  return Array.from(lettersOnly).every((letter) => MEASUREMENT_LETTERS.has(letter));
+}
+
 function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
@@ -344,7 +377,7 @@ function analyzeProductTitles(products: ProductData[]) {
     }
 
     const previousToken = baseTokens[baseTokens.length - 2];
-    if (previousToken && /\d/.test(previousToken)) {
+    if (isMeasurementToken(previousToken)) {
       break;
     }
 
