@@ -601,8 +601,60 @@ export default function CombinedProductSheetClientPage() {
   const [products, setProducts] = useState<ProductData[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle", message: "" });
   const [pdfState, setPdfState] = useState<PdfState>({ status: "idle", message: "" });
+  const [sharedDescription, setSharedDescription] = useState("");
+  const [hiddenSpecLabels, setHiddenSpecLabels] = useState<string[]>([]);
 
   const hasProducts = products.length > 0;
+
+  const availableSpecLabels = useMemo(() => {
+    const labels: string[] = [];
+    const seen = new Set<string>();
+
+    products.forEach((product) => {
+      product.specs.forEach((spec) => {
+        const label = spec.key.trim();
+
+        if (!label) {
+          return;
+        }
+
+        if (EXCLUDED_SPEC_KEYS.has(normalizeSpecKey(label))) {
+          return;
+        }
+
+        if (seen.has(label)) {
+          return;
+        }
+
+        seen.add(label);
+        labels.push(label);
+      });
+    });
+
+    return labels;
+  }, [products]);
+
+  const visibleSpecLabels = useMemo(() => {
+    const hiddenSet = new Set(hiddenSpecLabels);
+    return availableSpecLabels.filter((label) => !hiddenSet.has(label));
+  }, [availableSpecLabels, hiddenSpecLabels]);
+
+  useEffect(() => {
+    setHiddenSpecLabels((previous) =>
+      previous.filter((label) => availableSpecLabels.includes(label)),
+    );
+  }, [availableSpecLabels]);
+
+  const articleGridTemplate = useMemo(() => {
+    const baseColumns = [
+      "minmax(140px, 0.9fr)",
+      "minmax(220px, 1.4fr)",
+      "minmax(120px, 0.8fr)",
+    ];
+    const specColumns = visibleSpecLabels.map(() => "minmax(160px, 1fr)");
+
+    return [...baseColumns, ...specColumns, "minmax(90px, 0.6fr)"].join(" ");
+  }, [visibleSpecLabels]);
 
   const fetchMessageStyles = useMemo(() => {
     switch (fetchState.status) {
@@ -673,6 +725,8 @@ export default function CombinedProductSheetClientPage() {
       }
 
       setProducts(successful);
+      setSharedDescription(successful[0]?.description ?? "");
+      setHiddenSpecLabels([]);
 
       if (errors.length > 0) {
         setFetchState({ status: "error", message: `Kunde inte hämta vissa artiklar:\n${errors.join("\n")}` });
@@ -716,8 +770,31 @@ export default function CombinedProductSheetClientPage() {
     });
   };
 
+  const handleHideSpec = useCallback((label: string) => {
+    setHiddenSpecLabels((previous) => {
+      if (previous.includes(label)) {
+        return previous;
+      }
+
+      return [...previous, label];
+    });
+  }, []);
+
+  const handleShowSpec = useCallback((label: string) => {
+    setHiddenSpecLabels((previous) => previous.filter((value) => value !== label));
+  }, []);
+
   const handleRemoveProduct = (index: number) => {
-    setProducts((previous) => previous.filter((_, productIndex) => productIndex !== index));
+    setProducts((previous) => {
+      const next = previous.filter((_, productIndex) => productIndex !== index);
+
+      if (next.length === 0) {
+        setSharedDescription("");
+        setHiddenSpecLabels([]);
+      }
+
+      return next;
+    });
   };
 
   const handleGeneratePdf = async () => {
@@ -746,7 +823,7 @@ export default function CombinedProductSheetClientPage() {
       const brandBlue = hexToRgb("#023562");
 
       const firstProduct = products[0];
-      const sharedDescription = firstProduct?.description ?? "";
+      const descriptionForPdf = sharedDescription || "";
       const sharedImage = firstProduct?.image ?? "";
       const { combinedTitle, prefixTokens, suffixTokens } = analyzeProductTitles(products);
 
@@ -864,7 +941,7 @@ export default function CombinedProductSheetClientPage() {
 
       let descriptionBottom = Math.max(descriptionStartY, columnLimitY);
 
-      if (sharedDescription) {
+      if (descriptionForPdf) {
         doc.setFont(baseFont, boldStyle);
         doc.setFontSize(13);
         doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
@@ -877,7 +954,7 @@ export default function CombinedProductSheetClientPage() {
         const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
         let lastLineBaseline: number | null = null;
 
-        const paragraphs = sharedDescription.split(/\r?\n\s*\r?\n/);
+        const paragraphs = descriptionForPdf.split(/\r?\n\s*\r?\n/);
 
         for (const [index, paragraph] of paragraphs.entries()) {
           const normalizedParagraph = sanitizePdfText(paragraph.replace(/\r?\n/g, " ").trim());
@@ -968,6 +1045,7 @@ export default function CombinedProductSheetClientPage() {
         return trimmed || sanitizePdfText("-");
       };
 
+      const hiddenSpecSet = new Set(hiddenSpecLabels);
       const specOrder: string[] = [];
       const rawEntries = products.map((product) => {
         const articleNumber = displayValue(product.articleNumber);
@@ -1012,7 +1090,9 @@ export default function CombinedProductSheetClientPage() {
         };
       });
 
-      const sharedSpecLabels = specOrder.filter((label) => {
+      const visibleSpecOrder = specOrder.filter((label) => !hiddenSpecSet.has(label));
+
+      const sharedSpecLabels = visibleSpecOrder.filter((label) => {
         const firstValue = (rawEntries[0]?.specMap.get(label) ?? "").trim();
         if (!firstValue) {
           return false;
@@ -1029,7 +1109,7 @@ export default function CombinedProductSheetClientPage() {
         value: displayValue(rawEntries[0]?.specMap.get(label)),
       }));
 
-      const remainingSpecLabels = specOrder.filter(
+      const remainingSpecLabels = visibleSpecOrder.filter(
         (label) => !sharedSpecLabels.includes(label),
       );
       const filteredSpecLabels = remainingSpecLabels.filter((label) =>
@@ -1290,93 +1370,138 @@ export default function CombinedProductSheetClientPage() {
 
       {hasProducts ? (
         <section className="space-y-6 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-xl font-semibold text-neutral-900">Artiklar</h2>
-              <div className="flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-                {pdfState.message ? <p className={pdfMessageStyles}>{pdfState.message}</p> : <span className="hidden sm:block" />}
-                <Button type="button" onClick={handleGeneratePdf} variant="secondary" className="w-full sm:w-auto">
-                  Skapa samlat produktblad
-                </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl font-semibold text-neutral-900">Artiklar</h2>
+            <div className="flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+              {pdfState.message ? <p className={pdfMessageStyles}>{pdfState.message}</p> : <span className="hidden sm:block" />}
+              <Button type="button" onClick={handleGeneratePdf} variant="secondary" className="w-full sm:w-auto">
+                Skapa samlat produktblad
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Specifikationer</h3>
+                <p className="text-sm text-neutral-600">
+                  Välj vilka specifikationer som ska visas i listan och i PDF:en.
+                </p>
               </div>
+              {visibleSpecLabels.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {visibleSpecLabels.map((label) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-sm text-neutral-700"
+                    >
+                      <span>{label}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs font-medium text-neutral-500 hover:text-danger"
+                        onClick={() => handleHideSpec(label)}
+                      >
+                        Ta bort
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500">Inga specifikationer valda. Lägg till en nedan.</p>
+              )}
+              {hiddenSpecLabels.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {hiddenSpecLabels.map((label) => (
+                    <Button
+                      key={label}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full px-3 text-xs font-semibold"
+                      onClick={() => handleShowSpec(label)}
+                    >
+                      Lägg till {label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {products.map((product, index) => (
-              <article
-                key={product.articleNumber}
-                className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-neutral-500">Artikelnummer</p>
-                    <p className="text-base font-semibold text-neutral-900">{product.articleNumber}</p>
-                  </div>
-                  <Button type="button" variant="ghost" onClick={() => handleRemoveProduct(index)}>
-                    Ta bort
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-neutral-700" htmlFor="shared-description">
+                Produktbeskrivning
+              </label>
+              <Textarea
+                id="shared-description"
+                rows={4}
+                value={sharedDescription}
+                onChange={(event) => setSharedDescription(event.target.value)}
+                placeholder="Beskrivning som gäller för alla artiklar."
+              />
+            </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-neutral-700" htmlFor={`title-${product.articleNumber}`}>
-                      Titel
-                    </label>
-                    <Input
-                      id={`title-${product.articleNumber}`}
-                      value={product.title}
-                      onChange={(event) => updateProductField(index, "title", event.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-neutral-700" htmlFor={`weight-${product.articleNumber}`}>
-                      Vikt
-                    </label>
-                    <Input
-                      id={`weight-${product.articleNumber}`}
-                      value={product.weight}
-                      onChange={(event) => updateProductField(index, "weight", event.target.value)}
-                      placeholder="Exempel: 1,2 kg"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label
-                    className="text-sm font-medium text-neutral-700"
-                    htmlFor={`description-${product.articleNumber}`}
+            <div className="space-y-2">
+              <div className="overflow-x-auto">
+                <div className="min-w-full space-y-2">
+                  <div
+                    className="grid items-center gap-3 rounded-2xl bg-neutral-100 p-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+                    style={{ gridTemplateColumns: articleGridTemplate }}
                   >
-                    Beskrivning
-                  </label>
-                  <Textarea
-                    id={`description-${product.articleNumber}`}
-                    rows={4}
-                    value={product.description}
-                    onChange={(event) => updateProductField(index, "description", event.target.value)}
-                  />
-                </div>
-
-                {product.specs.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-                      Specifikationer
-                    </h3>
-                    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {product.specs.map((spec, specIndex) => (
-                        <div
-                          key={`${product.articleNumber}-${specIndex}`}
-                          className="rounded-xl border border-neutral-200 bg-white/60 p-3"
-                        >
-                          <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                            {spec.key}
-                          </dt>
-                          <dd className="text-sm text-neutral-700">{spec.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                    <span>Artikelnummer</span>
+                    <span>Titel</span>
+                    <span>Vikt</span>
+                    {visibleSpecLabels.map((label) => (
+                      <span key={label}>{label}</span>
+                    ))}
+                    <span className="text-right">Ta bort</span>
                   </div>
-                ) : null}
-              </article>
-            ))}
+                  {products.map((product, index) => {
+                    const specMap = new Map<string, string>();
+                    product.specs.forEach((spec) => {
+                      specMap.set(spec.key.trim(), spec.value);
+                    });
+
+                    return (
+                      <div
+                        key={product.articleNumber}
+                        className="grid items-center gap-3 rounded-2xl border border-neutral-200 bg-white/80 p-3 shadow-sm"
+                        style={{ gridTemplateColumns: articleGridTemplate }}
+                      >
+                        <div className="text-sm font-semibold text-neutral-900">{product.articleNumber}</div>
+                        <Input
+                          id={`title-${product.articleNumber}`}
+                          value={product.title}
+                          onChange={(event) => updateProductField(index, "title", event.target.value)}
+                        />
+                        <Input
+                          id={`weight-${product.articleNumber}`}
+                          value={product.weight}
+                          onChange={(event) => updateProductField(index, "weight", event.target.value)}
+                          placeholder="Exempel: 1,2 kg"
+                        />
+                        {visibleSpecLabels.map((label) => (
+                          <div key={`${product.articleNumber}-${label}`} className="text-sm text-neutral-700">
+                            {(specMap.get(label)?.trim() ?? "") || "-"}
+                          </div>
+                        ))}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveProduct(index)}
+                          >
+                            Ta bort
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       ) : null}
