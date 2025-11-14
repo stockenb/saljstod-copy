@@ -13,10 +13,9 @@ export function Navbar() {
   const nav = useMemo(
     () => [
       { href: "/", label: "Hem" },
+      { href: "/artikelbas", label: "Artikelbas" },
       { href: "/produktblad", label: "Produktblad" },
       { href: "/produktblad/samlat", label: "Samlade produktblad" },
-      { href: "/nyheter", label: "Nyheter" },
-      { href: "https://www.nilsahlgren.se/", label: "Webbshop" },
     ],
     []
   );
