@@ -281,6 +281,67 @@ function findCommonSuffixTokens(tokenLists: string[][]) {
   return suffix;
 }
 
+function analyzeProductTitles(products: ProductData[]) {
+  const fallbackTitle =
+    (products[0]?.title ?? "").trim() || (products[0]?.articleNumber ?? "").trim() || "Samlat produktblad";
+
+  const titles = products
+    .map((product) => (product.title ?? "").trim())
+    .filter(Boolean);
+
+  if (titles.length === 0) {
+    return { combinedTitle: fallbackTitle, prefixTokens: [] as string[], suffixTokens: [] as string[] };
+  }
+
+  const tokenLists = titles.map(tokenizeTitle).filter((tokens) => tokens.length > 0);
+
+  if (tokenLists.length === 0) {
+    return { combinedTitle: fallbackTitle, prefixTokens: [] as string[], suffixTokens: [] as string[] };
+  }
+
+  const prefixTokens = findCommonPrefixTokens(tokenLists);
+  const suffixTokens = findCommonSuffixTokens(tokenLists);
+
+  const prefixLength = prefixTokens.length;
+  const suffixLength = suffixTokens.length;
+
+  const sizeTokenLists = tokenLists.map((tokens) => {
+    let endIndex = tokens.length - suffixLength;
+    if (endIndex < prefixLength) {
+      endIndex = prefixLength;
+    }
+
+    return tokens.slice(prefixLength, endIndex);
+  });
+
+  const normalizedSizes = sizeTokenLists.map((tokens) => tokens.join(" ").toLocaleLowerCase("sv-SE"));
+
+  const hasMultipleSizes =
+    normalizedSizes.length > 0 && normalizedSizes.some((value) => value !== normalizedSizes[0]);
+
+  const representativeTokens = tokenLists[0];
+  const baseTokens: string[] = [];
+
+  if (representativeTokens.length > 0) {
+    if (prefixLength > 0) {
+      baseTokens.push(...representativeTokens.slice(0, prefixLength));
+    }
+
+    if (!hasMultipleSizes && (sizeTokenLists[0]?.length ?? 0) > 0) {
+      baseTokens.push(...sizeTokenLists[0]);
+    }
+
+    const suffixStartIndex = representativeTokens.length - suffixLength;
+    if (suffixLength > 0 && suffixStartIndex >= 0 && suffixStartIndex >= baseTokens.length) {
+      baseTokens.push(...representativeTokens.slice(suffixStartIndex));
+    }
+  }
+
+  const combinedTitle = baseTokens.join(" ").trim() || fallbackTitle;
+
+  return { combinedTitle, prefixTokens, suffixTokens };
+}
+
 function normalizeUrl(raw: string): string {
   if (!raw) return raw;
   if (raw.startsWith("data:image/")) return raw;
@@ -469,8 +530,9 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function createFilename(products: ProductData[]) {
-  const first = products[0];
-  const base = first?.title || first?.articleNumber || "samlat-produktblad";
+  const { combinedTitle } = analyzeProductTitles(products);
+  const fallback = products[0]?.articleNumber || "samlat-produktblad";
+  const base = combinedTitle || fallback;
   return `${base}`
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -639,6 +701,7 @@ export default function CombinedProductSheetClientPage() {
       const firstProduct = products[0];
       const sharedDescription = firstProduct?.description ?? "";
       const sharedImage = firstProduct?.image ?? "";
+      const { combinedTitle, prefixTokens, suffixTokens } = analyzeProductTitles(products);
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -675,9 +738,10 @@ export default function CombinedProductSheetClientPage() {
       doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       doc.setFont(baseFont, boldStyle);
+      // Ändra värdet nedan för att justera rubrikens textstorlek i det samlade produktbladet.
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
-      const pdfTitle = sanitizePdfText(firstProduct?.title || "Samlat produktblad");
+      const pdfTitle = sanitizePdfText(combinedTitle || "Samlat produktblad");
       doc.text(pdfTitle, marginX + 8, headerTop + 12);
 
       doc.setFont(baseFont, normalStyle);
@@ -880,11 +944,6 @@ export default function CombinedProductSheetClientPage() {
         return { articleNumber, originalTitle, tokens, specMap };
       });
 
-      const tokenLists = rawEntries
-        .map((entry) => entry.tokens)
-        .filter((entryTokens) => entryTokens.length > 0);
-      const prefixTokens = findCommonPrefixTokens(tokenLists);
-      const suffixTokens = findCommonSuffixTokens(tokenLists);
       const prefixLength = prefixTokens.length;
       const suffixLength = suffixTokens.length;
 
