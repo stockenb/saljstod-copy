@@ -165,13 +165,18 @@ async function loadArticles(): Promise<CachedArticle[]> {
 type ArticleSearchOptions = {
   excludeBulk?: boolean;
   packagingFilters?: PackagingFilterValue[];
+  requireEveryPart?: boolean;
 };
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getSearchMatcher(query: string) {
+type SearchMatcherOptions = {
+  requireEveryPart?: boolean;
+};
+
+function getSearchMatcher(query: string, options: SearchMatcherOptions = {}) {
   const trimmedQuery = query.trim();
 
   if (!trimmedQuery) {
@@ -182,7 +187,6 @@ function getSearchMatcher(query: string) {
   const hasLeadingWildcard = trimmedQuery.startsWith("%");
   const hasTrailingWildcard = trimmedQuery.endsWith("%");
 
-
   const parts = trimmedQuery
     .split(/%+/)
     .map((part) => normalizeSearchText(part))
@@ -192,14 +196,20 @@ function getSearchMatcher(query: string) {
     return null;
   }
 
-if (!hasWildcard) {
+  if (options.requireEveryPart && hasWildcard) {
+    return (value: string) => parts.every((part) => value.includes(part));
+  }
+
+  if (!hasWildcard) {
     const [firstPart] = parts;
     return (value: string) => value.startsWith(firstPart);
   }
- if (!hasLeadingWildcard && !hasTrailingWildcard && parts.length === 1) {
+
+  if (!hasLeadingWildcard && !hasTrailingWildcard && parts.length === 1) {
     const [onlyPart] = parts;
     return (value: string) => value.startsWith(onlyPart);
   }
+
   const pattern = `${hasLeadingWildcard ? "" : "^"}${parts
     .map((part) => escapeRegExp(part))
     .join(".*")}${hasTrailingWildcard ? "" : "$"}`;
@@ -231,21 +241,25 @@ export async function findArticles(
   query: string,
   options: ArticleSearchOptions = {},
 ): Promise<ArtikelbasArticle[]> {
-  const matcher = getSearchMatcher(query);
+  const {
+    excludeBulk = false,
+    packagingFilters: rawPackagingFilters,
+    requireEveryPart = false,
+  } = options;
+
+  const matcher = getSearchMatcher(query, { requireEveryPart });
 
   if (!matcher) {
     return [];
   }
 
   const articles = await loadArticles();
-  const packagingFilters = options.packagingFilters
-    ? Array.from(new Set(options.packagingFilters))
+  const packagingFilters = rawPackagingFilters
+    ? Array.from(new Set(rawPackagingFilters))
     : [];
 
   return articles
-    .filter(
-      (article) => !options.excludeBulk || !article.articleNumber.startsWith("B"),
-    )
+    .filter((article) => !excludeBulk || !article.articleNumber.startsWith("B"))
     .filter(
       (article) =>
         packagingFilters.length === 0 ||

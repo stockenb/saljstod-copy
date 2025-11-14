@@ -1,11 +1,24 @@
 "use client";
 
-import { ChangeEvent, KeyboardEvent, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
+import {
+  analyzeProductTitles,
+  extractSizeTokens,
+  tokenizeTitle,
+} from "@/lib/product-title";
 
 type Specification = {
   key: string;
@@ -20,7 +33,10 @@ type ProductFormData = {
   description: string;
   weight: string;
   specs: Specification[];
+  logo: string;
 };
+
+type ProductApiData = Omit<ProductFormData, "logo">;
 
 type FetchState = {
   status: "idle" | "loading" | "success" | "error";
@@ -35,6 +51,12 @@ type PdfState = {
 type PdfImage = {
   dataUrl: string;
   format: "PNG" | "JPEG" | "WEBP";
+};
+
+type ArticleSuggestion = {
+  articleNumber: string;
+  title: string;
+  link: string;
 };
 
 const LOGO_IMAGE_PATH = "/na_foretag.png";
@@ -61,6 +83,7 @@ const initialForm: ProductFormData = {
   description: "",
   weight: "",
   specs: [],
+  logo: LOGO_IMAGE_PATH,
 };
 
 const contactDetails = [
@@ -69,6 +92,50 @@ const contactDetails = [
 ];
 
 const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
+
+function deriveSizeValue(product: { articleNumber?: string | null; title?: string | null }) {
+  const analysis = analyzeProductTitles([
+    { articleNumber: product.articleNumber ?? "", title: product.title ?? "" },
+  ]);
+  const tokens = tokenizeTitle((product.title ?? "").trim());
+  const sizeTokens = extractSizeTokens(
+    tokens,
+    analysis.prefixTokens,
+    analysis.suffixTokens,
+  );
+  const sizeText = sizeTokens.join(" ").trim();
+  const fallback = (product.title ?? "").trim();
+
+  return sizeText || fallback || null;
+}
+
+function upsertSizeSpecification(specs: Specification[], sizeValue: string | null) {
+  if (!sizeValue) {
+    return specs;
+  }
+
+  const trimmedValue = sizeValue.trim();
+  if (!trimmedValue) {
+    return specs;
+  }
+
+  const existingIndex = specs.findIndex(
+    (spec) => spec.key.trim().toLowerCase() === "storlek",
+  );
+
+  if (existingIndex >= 0) {
+    const existing = specs[existingIndex];
+    if (existing.value.trim()) {
+      return specs;
+    }
+
+    const next = [...specs];
+    next[existingIndex] = { ...existing, value: trimmedValue };
+    return next;
+  }
+
+  return [{ key: "Storlek", value: trimmedValue }, ...specs];
+}
 
 function normalizeUrl(raw: string): string {
   // Låt data-URL:er vara
@@ -210,15 +277,18 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
   return await tryProxyFetch();
 }
 
-let logoCache: PdfImage | null | undefined;
+const logoImageCache = new Map<string, PdfImage | null>();
 
-async function loadLogoImage() {
-  if (typeof logoCache !== "undefined") {
-    return logoCache;
+async function loadLogoImage(source: string) {
+  const key = source || LOGO_IMAGE_PATH;
+
+  if (logoImageCache.has(key)) {
+    return logoImageCache.get(key) ?? null;
   }
 
-  logoCache = await convertImageToDataUrl(LOGO_IMAGE_PATH);
-  return logoCache;
+  const image = await convertImageToDataUrl(key);
+  logoImageCache.set(key, image ?? null);
+  return image ?? null;
 }
 
 function createFilename(form: ProductFormData) {
@@ -283,6 +353,10 @@ export default function ProduktbladPage() {
   const [form, setForm] = useState<ProductFormData>(initialForm);
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle", message: "" });
   const [pdfState, setPdfState] = useState<PdfState>({ status: "idle", message: "" });
+  const [suggestions, setSuggestions] = useState<ArticleSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const blurTimeoutRef = useRef<number | null>(null);
 
   const hasSpecs = form.specs.length > 0;
 
@@ -312,8 +386,64 @@ export default function ProduktbladPage() {
     }
   }, [pdfState.status]);
 
-  const handleLookup = async () => {
-    if (!lookupId.trim()) {
+  const clearBlurTimeout = useCallback(() => {
+    if (blurTimeoutRef.current !== null) {
+      window.clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearBlurTimeout(), [clearBlurTimeout]);
+
+  useEffect(() => {
+    const trimmed = lookupId.trim();
+
+    if (trimmed.length < 1) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setActiveSuggestionIndex(-1);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("q", trimmed);
+        params.set("limit", "8");
+        const response = await fetch(`/api/artikelbas/search?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Sökningen misslyckades med status ${response.status}`);
+        }
+
+        const data = (await response.json()) as { articles: ArticleSuggestion[] };
+        setSuggestions(data.articles);
+        setShowSuggestions(data.articles.length > 0);
+        setActiveSuggestionIndex(-1);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Kunde inte hämta artikel-förslag", error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setActiveSuggestionIndex(-1);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [lookupId]);
+
+  const handleLookup = useCallback(async () => {
+    const trimmed = lookupId.trim();
+
+    if (!trimmed) {
       setFetchState({ status: "error", message: "Ange ett artikelnummer att söka på." });
       return;
     }
@@ -321,7 +451,7 @@ export default function ProduktbladPage() {
     setFetchState({ status: "loading", message: "Hämtar artikelinformation..." });
 
     try {
-      const response = await fetch(`/api/produktblad?id=${encodeURIComponent(lookupId.trim())}`);
+      const response = await fetch(`/api/produktblad?id=${encodeURIComponent(trimmed)}`);
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -332,20 +462,30 @@ export default function ProduktbladPage() {
         return;
       }
 
-      const data = (await response.json()) as {
-        product: ProductFormData;
-      };
+      const data = (await response.json()) as { product: ProductApiData };
 
-      setForm({
-        articleNumber: data.product.articleNumber ?? lookupId.trim(),
+      const specs = Array.isArray(data.product.specs) ? data.product.specs : [];
+      const sizeValue = deriveSizeValue({
+        articleNumber: data.product.articleNumber ?? trimmed,
+        title: data.product.title ?? "",
+      });
+      const nextSpecs = upsertSizeSpecification(specs, sizeValue);
+
+      setForm((previous) => ({
+        ...previous,
+        articleNumber: data.product.articleNumber ?? trimmed,
         title: data.product.title ?? "",
         link: data.product.link ?? "",
         image: data.product.image ?? "",
         description: data.product.description ?? "",
         weight: data.product.weight ?? "",
-        specs: Array.isArray(data.product.specs) ? data.product.specs : [],
-      });
-      setLookupId(data.product.articleNumber ?? lookupId.trim());
+        specs: nextSpecs,
+        logo: previous.logo || LOGO_IMAGE_PATH,
+      }));
+      setLookupId(data.product.articleNumber ?? trimmed);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setActiveSuggestionIndex(-1);
       setPdfState({ status: "idle", message: "" });
       setFetchState({ status: "success", message: "Artikelinformation hämtad." });
     } catch (error) {
@@ -355,7 +495,86 @@ export default function ProduktbladPage() {
         message: "Kunde inte hämta data just nu. Försök igen senare.",
       });
     }
-  };
+  }, [lookupId]);
+
+  const handleSelectSuggestion = useCallback(
+    (suggestion: ArticleSuggestion) => {
+      clearBlurTimeout();
+      setLookupId(suggestion.articleNumber);
+      setShowSuggestions(false);
+      setSuggestions([]);
+      setActiveSuggestionIndex(-1);
+    },
+    [clearBlurTimeout],
+  );
+
+  const handleLookupFocus = useCallback(() => {
+    clearBlurTimeout();
+    if (suggestions.length > 0) {
+      setShowSuggestions(true);
+    }
+  }, [clearBlurTimeout, suggestions.length]);
+
+  const handleLookupBlur = useCallback(() => {
+    clearBlurTimeout();
+    blurTimeoutRef.current = window.setTimeout(() => {
+      setShowSuggestions(false);
+      setActiveSuggestionIndex(-1);
+    }, 150);
+  }, [clearBlurTimeout]);
+
+  const handleLookupKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "ArrowDown" && suggestions.length > 0) {
+        event.preventDefault();
+        setShowSuggestions(true);
+        setActiveSuggestionIndex((current) => {
+          const nextIndex = current + 1;
+          return nextIndex >= suggestions.length ? 0 : nextIndex;
+        });
+        return;
+      }
+
+      if (event.key === "ArrowUp" && suggestions.length > 0) {
+        event.preventDefault();
+        setShowSuggestions(true);
+        setActiveSuggestionIndex((current) => {
+          if (current <= 0) {
+            return suggestions.length - 1;
+          }
+          return current - 1;
+        });
+        return;
+      }
+
+      if (event.key === "Enter") {
+        if (showSuggestions && activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
+          event.preventDefault();
+          handleSelectSuggestion(suggestions[activeSuggestionIndex]);
+          return;
+        }
+
+        event.preventDefault();
+        void handleLookup();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (showSuggestions) {
+          event.preventDefault();
+          setShowSuggestions(false);
+          setActiveSuggestionIndex(-1);
+        }
+      }
+    },
+    [
+      activeSuggestionIndex,
+      handleLookup,
+      handleSelectSuggestion,
+      showSuggestions,
+      suggestions,
+    ],
+  );
 
   const handleFormChange = (field: keyof ProductFormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -417,14 +636,39 @@ export default function ProduktbladPage() {
     reader.readAsDataURL(file);
   };
 
-  function hexToRgb(hex: string): [number, number, number] {
-  const m = hex.trim().replace('#', '');
-  const full = m.length === 3 ? m.split('').map(c => c + c).join('') : m;
-  const num = parseInt(full, 16);
-  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
-}
-const brandBlue = hexToRgb("#023562");
+  const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
 
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setForm((prev) => ({ ...prev, logo: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = () => {
+    setForm((prev) => ({ ...prev, logo: LOGO_IMAGE_PATH }));
+  };
+
+  function hexToRgb(hex: string): [number, number, number] {
+    const normalized = hex.trim().replace("#", "");
+    const full =
+      normalized.length === 3
+        ? normalized
+            .split("")
+            .map((char) => char + char)
+            .join("")
+        : normalized;
+    const num = Number.parseInt(full, 16);
+    return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+  }
+
+  const brandBlue = hexToRgb("#023562");
 
   const handleGeneratePdf = async () => {
     setPdfState({ status: "loading", message: "Genererar PDF..." });
@@ -432,7 +676,7 @@ const brandBlue = hexToRgb("#023562");
       const [{ jsPDF }, autoTableModule, logoImage] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
-        loadLogoImage(),
+        loadLogoImage(form.logo || LOGO_IMAGE_PATH),
       ]);
       const autoTable = autoTableModule.default;
 
@@ -785,12 +1029,60 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">
-            <Input
-              value={lookupId}
-              onChange={(event) => setLookupId(event.target.value)}
-              placeholder="Till exempel 12345"
-              aria-label="Artikelnummer att hämta"
-            />
+            <div className="relative">
+              <Input
+                value={lookupId}
+                onChange={(event) => {
+                  setLookupId(event.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={handleLookupFocus}
+                onBlur={handleLookupBlur}
+                onKeyDown={handleLookupKeyDown}
+                placeholder="Till exempel 12345 eller grind"
+                aria-label="Artikelnummer eller söktext att hämta"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={showSuggestions && suggestions.length > 0}
+                aria-controls="produktblad-article-suggestions"
+                autoComplete="off"
+              />
+              {showSuggestions && suggestions.length > 0 ? (
+                <ul
+                  id="produktblad-article-suggestions"
+                  role="listbox"
+                  className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-neutral-200 bg-white shadow-lg"
+                >
+                  {suggestions.map((suggestion, index) => {
+                    const isActive = index === activeSuggestionIndex;
+                    return (
+                      <li key={`${suggestion.articleNumber}-${index}`}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={isActive}
+                          className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${
+                            isActive
+                              ? "bg-neutral-100 text-neutral-900"
+                              : "text-neutral-700 hover:bg-neutral-50"
+                          }`}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            clearBlurTimeout();
+                          }}
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                        >
+                          <span className="font-medium text-neutral-900">
+                            {suggestion.articleNumber}
+                          </span>
+                          <span className="text-xs text-neutral-500">{suggestion.title}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
           </div>
           <Button onClick={() => void handleLookup()} disabled={fetchState.status === "loading"}>
             {fetchState.status === "loading" ? "Hämtar..." : "Hämta uppgifter"}
@@ -876,6 +1168,41 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
                 ) : (
                   <span className="text-sm text-neutral-400">Ingen bild vald ännu</span>
                 )}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-neutral-700">Logotyp</label>
+              <input
+                className="mt-1 block w-full rounded-2xl border border-dashed border-neutral-300 bg-white/60 px-4 py-3 text-sm text-neutral-700 focus:border-primary focus:outline-none"
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+              />
+              <p className="mt-1 text-xs text-neutral-500">
+                Ladda upp en egen logotyp som ersätter standardlogotypen i produktbladet.
+              </p>
+              <div className="mt-3 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white/60 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  {form.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.logo}
+                      alt="Logotyp"
+                      className="h-10 w-auto max-w-[140px] object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs text-neutral-400">Ingen logotyp vald</span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetLogo}
+                  disabled={form.logo === LOGO_IMAGE_PATH}
+                >
+                  Återställ
+                </Button>
               </div>
             </div>
           </div>
