@@ -161,6 +161,22 @@ function getPackagingValue(specMap: Map<string, string>) {
   );
 }
 
+function isPrimaryPackagingTypeLabel(normalizedLabel: string) {
+  if (!normalizedLabel.includes("primärförp")) {
+    return false;
+  }
+
+  return !normalizedLabel.includes("antal");
+}
+
+function isPrimaryPackagingQuantityLabel(normalizedLabel: string) {
+  if (!normalizedLabel.includes("primärförp")) {
+    return false;
+  }
+
+  return normalizedLabel.includes("antal");
+}
+
 const PACKAGING_RANK = {
   sb: 0,
   paket: 1,
@@ -645,16 +661,17 @@ export default function CombinedProductSheetClientPage() {
     );
   }, [availableSpecLabels]);
 
-  const articleGridTemplate = useMemo(() => {
-    const baseColumns = [
-      "minmax(140px, 0.9fr)",
-      "minmax(220px, 1.4fr)",
-      "minmax(120px, 0.8fr)",
-    ];
-    const specColumns = visibleSpecLabels.map(() => "minmax(160px, 1fr)");
-
-    return [...baseColumns, ...specColumns, "minmax(90px, 0.6fr)"].join(" ");
-  }, [visibleSpecLabels]);
+  const articleGridTemplate = useMemo(
+    () =>
+      [
+        "minmax(140px, 0.9fr)",
+        "minmax(220px, 1.4fr)",
+        "minmax(140px, 1fr)",
+        "minmax(140px, 1fr)",
+        "minmax(90px, 0.6fr)",
+      ].join(" "),
+    [],
+  );
 
   const fetchMessageStyles = useMemo(() => {
     switch (fetchState.status) {
@@ -1450,11 +1467,9 @@ export default function CombinedProductSheetClientPage() {
                     style={{ gridTemplateColumns: articleGridTemplate }}
                   >
                     <span>Artikelnummer</span>
-                    <span>Titel</span>
-                    <span>Vikt</span>
-                    {visibleSpecLabels.map((label) => (
-                      <span key={label}>{label}</span>
-                    ))}
+                    <span>Benämning</span>
+                    <span>Primärförp.</span>
+                    <span>Antal i primärförp.</span>
                     <span className="text-right">Ta bort</span>
                   </div>
                   {products.map((product, index) => {
@@ -1462,6 +1477,14 @@ export default function CombinedProductSheetClientPage() {
                     product.specs.forEach((spec) => {
                       specMap.set(spec.key.trim(), spec.value);
                     });
+
+                    const primaryPackaging =
+                      getSpecValue(specMap, (label) => isPrimaryPackagingTypeLabel(label)) ?? "-";
+                    const primaryPackagingQuantity =
+                      getSpecValue(
+                        specMap,
+                        (label) => isPrimaryPackagingQuantityLabel(label),
+                      ) ?? "-";
 
                     return (
                       <div
@@ -1474,18 +1497,10 @@ export default function CombinedProductSheetClientPage() {
                           id={`title-${product.articleNumber}`}
                           value={product.title}
                           onChange={(event) => updateProductField(index, "title", event.target.value)}
+                          placeholder="Benämning"
                         />
-                        <Input
-                          id={`weight-${product.articleNumber}`}
-                          value={product.weight}
-                          onChange={(event) => updateProductField(index, "weight", event.target.value)}
-                          placeholder="Exempel: 1,2 kg"
-                        />
-                        {visibleSpecLabels.map((label) => (
-                          <div key={`${product.articleNumber}-${label}`} className="text-sm text-neutral-700">
-                            {(specMap.get(label)?.trim() ?? "") || "-"}
-                          </div>
-                        ))}
+                        <div className="text-sm text-neutral-700">{primaryPackaging}</div>
+                        <div className="text-sm text-neutral-700">{primaryPackagingQuantity}</div>
                         <div className="flex justify-end">
                           <Button
                             type="button"
