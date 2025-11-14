@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
-import { analyzeProductTitles, tokenizeTitle } from "@/lib/product-title";
+import {
+  analyzeProductTitles,
+  extractSizeTokens,
+  tokenizeTitle,
+} from "@/lib/product-title";
 
 type Specification = {
   key: string;
@@ -926,11 +930,7 @@ export default function CombinedProductSheetClientPage() {
 
       const articleEntries = rawEntries.map((entry) => {
         const { tokens } = entry;
-        let endIndex = tokens.length - suffixLength;
-        if (endIndex < prefixLength) {
-          endIndex = prefixLength;
-        }
-        const sizeTokens = tokens.slice(prefixLength, endIndex);
+        const sizeTokens = extractSizeTokens(tokens, prefixTokens, suffixTokens);
         const sizeText = sizeTokens.join(" ").trim();
         const packaging = getPackagingValue(entry.specMap);
 

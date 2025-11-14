@@ -16,6 +16,18 @@ const MEASUREMENT_LETTERS = new Set([
   "m",
 ]);
 
+const MEASUREMENT_UNITS = new Set([
+  "mm",
+  "cm",
+  "m",
+  "meter",
+  "tum",
+]);
+
+const SIZE_CONNECTOR_TOKENS = new Set(["x", "×", "/"]);
+
+const SIZE_RANGE_TOKENS = new Set(["-", "–", "—"]);
+
 export function isMeasurementToken(token: string | undefined) {
   if (!token) {
     return false;
@@ -41,6 +53,112 @@ export function tokenizeTitle(title: string) {
     .split(/\s+/)
     .map((token) => token.trim())
     .filter(Boolean);
+}
+
+function isSizeConnectorToken(
+  token: string | undefined,
+  previousToken: string | undefined,
+  nextToken: string | undefined,
+) {
+  if (!token) {
+    return false;
+  }
+
+  const normalized = token.trim().toLocaleLowerCase("sv-SE");
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (SIZE_CONNECTOR_TOKENS.has(normalized)) {
+    return (
+      (previousToken && isMeasurementToken(previousToken)) ||
+      (nextToken && isMeasurementToken(nextToken))
+    );
+  }
+
+  if (SIZE_RANGE_TOKENS.has(normalized)) {
+    return (
+      (previousToken && isMeasurementToken(previousToken)) ||
+      (nextToken && isMeasurementToken(nextToken))
+    );
+  }
+
+  if (MEASUREMENT_UNITS.has(normalized)) {
+    return previousToken ? isMeasurementToken(previousToken) : false;
+  }
+
+  return false;
+}
+
+export function extractSizeTokens(
+  tokens: string[],
+  prefixTokens: string[],
+  suffixTokens: string[],
+) {
+  if (tokens.length === 0) {
+    return [] as string[];
+  }
+
+  const prefixLength = Math.min(prefixTokens.length, tokens.length);
+  const suffixLength = Math.min(suffixTokens.length, tokens.length);
+
+  let endIndex = tokens.length - suffixLength;
+  if (endIndex < prefixLength) {
+    endIndex = prefixLength;
+  }
+
+  let sizeTokens = tokens.slice(prefixLength, endIndex);
+
+  if (sizeTokens.length > 0) {
+    return sizeTokens;
+  }
+
+  let activeStart: number | null = null;
+  let activeEnd: number | null = null;
+  let bestStart: number | null = null;
+  let bestEnd: number | null = null;
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+
+    if (isMeasurementToken(token)) {
+      if (activeStart === null) {
+        activeStart = index;
+      }
+      activeEnd = index + 1;
+      continue;
+    }
+
+    if (activeStart !== null) {
+      const previousToken = tokens[index - 1];
+      const nextToken = tokens[index + 1];
+
+      if (isSizeConnectorToken(token, previousToken, nextToken)) {
+        activeEnd = index + 1;
+        continue;
+      }
+
+      if (activeEnd !== null) {
+        bestStart = activeStart;
+        bestEnd = activeEnd;
+      }
+
+      activeStart = null;
+      activeEnd = null;
+    }
+  }
+
+  if (activeStart !== null && activeEnd !== null) {
+    bestStart = activeStart;
+    bestEnd = activeEnd;
+  }
+
+  if (bestStart !== null && bestEnd !== null && bestStart < bestEnd) {
+    sizeTokens = tokens.slice(bestStart, bestEnd);
+  }
+
+  return sizeTokens;
 }
 
 export function findCommonPrefixTokens(tokenLists: string[][]) {
@@ -119,14 +237,9 @@ export function analyzeProductTitles(products: TitleAnalysisProduct[]) {
   const prefixLength = prefixTokens.length;
   const suffixLength = suffixTokens.length;
 
-  const sizeTokenLists = tokenLists.map((tokens) => {
-    let endIndex = tokens.length - suffixLength;
-    if (endIndex < prefixLength) {
-      endIndex = prefixLength;
-    }
-
-    return tokens.slice(prefixLength, endIndex);
-  });
+  const sizeTokenLists = tokenLists.map((tokens) =>
+    extractSizeTokens(tokens, prefixTokens, suffixTokens),
+  );
 
   const normalizedSizes = sizeTokenLists.map((tokens) => tokens.join(" ").toLocaleLowerCase("sv-SE"));
 

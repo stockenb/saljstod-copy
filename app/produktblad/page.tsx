@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
-import { analyzeProductTitles, tokenizeTitle } from "@/lib/product-title";
+import {
+  analyzeProductTitles,
+  extractSizeTokens,
+  tokenizeTitle,
+} from "@/lib/product-title";
 
 type Specification = {
   key: string;
@@ -94,15 +98,11 @@ function deriveSizeValue(product: { articleNumber?: string | null; title?: strin
     { articleNumber: product.articleNumber ?? "", title: product.title ?? "" },
   ]);
   const tokens = tokenizeTitle((product.title ?? "").trim());
-  const prefixLength = analysis.prefixTokens.length;
-  const suffixLength = analysis.suffixTokens.length;
-
-  let endIndex = tokens.length - suffixLength;
-  if (endIndex < prefixLength) {
-    endIndex = prefixLength;
-  }
-
-  const sizeTokens = tokens.slice(prefixLength, endIndex);
+  const sizeTokens = extractSizeTokens(
+    tokens,
+    analysis.prefixTokens,
+    analysis.suffixTokens,
+  );
   const sizeText = sizeTokens.join(" ").trim();
   const fallback = (product.title ?? "").trim();
 

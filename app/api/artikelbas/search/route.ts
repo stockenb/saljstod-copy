@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
     ? DEFAULT_LIMIT
     : Math.min(Math.max(parsedLimit, 1), MAX_LIMIT);
 
-  const normalizedQuery = trimmed.includes("%") ? trimmed : `%${trimmed}%`;
+  const normalizedQuery = trimmed.includes("%")
+    ? trimmed
+    : `%${trimmed.replace(/\s+/g, "%")}%`;
 
   try {
     const articles = await findArticles(normalizedQuery, {
