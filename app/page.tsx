@@ -53,7 +53,7 @@ const secondaryCards: Card[] = [
   {
     href: "/artikelbas",
     title: "Artikelbas",
-    description: "Sök produktfamiljer och skapa produktblad automatiskt.",
+    description: "Skapa artikelurval för att enklare skapa samlade produktblad.",
     emoji: "🗂️",
     variant: "compact" as const,
   },

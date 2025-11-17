@@ -346,7 +346,7 @@ export default function Home() {
   return (
     <div className="space-y-10">
       <div className="max-w-3xl space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Skapa EAN</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 mt-10">Skapa EAN</h1>
         <p className="text-sm text-neutral-600">
           Skapa en streckkod från en EAN-13-kod och ladda ner den som PNG för att använda i dina
           material.

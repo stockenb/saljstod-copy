@@ -129,7 +129,7 @@ export default function ArtikelbasPage() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 mt-10">
       <div className="max-w-3xl space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
           Artikelbas
@@ -238,7 +238,7 @@ export default function ArtikelbasPage() {
               disabled={articles.length === 0}
               className="w-full sm:w-auto"
             >
-              Skapa samlat produktblad
+              Spara urval och skapa produktblad
             </Button>
           </div>
         </div>
