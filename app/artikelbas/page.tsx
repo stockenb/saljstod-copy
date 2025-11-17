@@ -162,7 +162,7 @@ export default function ArtikelbasPage() {
               <legend className="text-sm font-medium text-neutral-700">
                 Ta endast med följande:
               </legend>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              <div className="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-8">
                 {PACKAGING_FILTER_OPTIONS.map((option) => {
                   const isChecked = packagingFilters.includes(option.value);
 
@@ -180,15 +180,15 @@ export default function ArtikelbasPage() {
                           return [...current, option.value];
                         })
                       }
-                      className={`group relative flex w-full flex-col items-center gap-1.5 rounded-lg border text-[11px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
+                      className={`group relative flex w-full max-w-[120px] flex-col items-center gap-1.5 rounded-lg border px-2 py-2 text-[13px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
                         isChecked
-                          ? "border-primary bg-neutral-50 shadow-sm hover:shadow"
+                          ? "border-accent bg-neutral-50 shadow-sm hover:shadow"
                           : "border-neutral-200 bg-transparent hover:bg-neutral-50/60 hover:shadow-sm"
                       }`}
                     >
                       {isChecked ? (
                         <span
-                          className="absolute right-2 bottom-4 h-2 w-2 rounded-full bg-primary"
+                          className="absolute right-2 bottom-4 h-2 w-2 rounded-full bg-accent"
                           aria-hidden
                         />
                       ) : null}
