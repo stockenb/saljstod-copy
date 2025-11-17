@@ -66,6 +66,60 @@ const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
 const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
 
+function deriveSizeValueFromTitle(
+  title: string | null | undefined,
+  prefixTokens: string[],
+  suffixTokens: string[],
+) {
+  const appendMillimeterSuffix = (sizeTokens: string[], suffix: string[]) => {
+    if (sizeTokens.length === 0) {
+      return sizeTokens;
+    }
+
+    const hasMeasurements = sizeTokens.some((token) => /\d/.test(token));
+    const hasMillimeter = sizeTokens.some(
+      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
+    );
+    const suffixMillimeter = suffix.find(
+      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
+    );
+
+    if (!hasMeasurements || hasMillimeter || !suffixMillimeter) {
+      return sizeTokens;
+    }
+
+    return [...sizeTokens, suffixMillimeter];
+  };
+
+  const trimmedTitle = (title ?? "").trim();
+
+  if (!trimmedTitle) {
+    return "";
+  }
+
+  const tokens = tokenizeTitle(trimmedTitle);
+  const primarySizeTokens = appendMillimeterSuffix(
+    extractSizeTokens(tokens, prefixTokens, suffixTokens),
+    suffixTokens,
+  );
+
+  if (primarySizeTokens.length > 0 && primarySizeTokens.length < tokens.length) {
+    return primarySizeTokens.join(" ").trim();
+  }
+
+  const fallbackAnalysis = analyzeProductTitles([{ title: trimmedTitle }]);
+  const fallbackSizeTokens = appendMillimeterSuffix(
+    extractSizeTokens(
+      tokens,
+      fallbackAnalysis.prefixTokens,
+      fallbackAnalysis.suffixTokens,
+    ),
+    fallbackAnalysis.suffixTokens,
+  );
+
+  return fallbackSizeTokens.join(" ").trim();
+}
+
 function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
@@ -929,9 +983,11 @@ export default function CombinedProductSheetClientPage() {
       const suffixLength = suffixTokens.length;
 
       const articleEntries = rawEntries.map((entry) => {
-        const { tokens } = entry;
-        const sizeTokens = extractSizeTokens(tokens, prefixTokens, suffixTokens);
-        const sizeText = sizeTokens.join(" ").trim();
+        const sizeText = deriveSizeValueFromTitle(
+          entry.originalTitle,
+          prefixTokens,
+          suffixTokens,
+        );
         const packaging = getPackagingValue(entry.specMap);
 
         return {
