@@ -3,12 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const nav = useMemo(
     () => [
@@ -19,6 +22,10 @@ export function Navbar() {
     ],
     []
   );
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
   const breadcrumbItems = useMemo(() => {
@@ -47,7 +54,23 @@ export function Navbar() {
           />
           <span className="sr-only">Säljstöd</span>
         </Link>
-    <nav className="flex flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-white/70 px-3 py-1.5 text-sm text-neutral-600 shadow-sm ring-1 ring-black/5">
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((open) => !open)}
+          className="flex items-center justify-center rounded-full bg-white/70 p-2 text-neutral-600 shadow-sm ring-1 ring-black/5 transition hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 lg:hidden"
+          aria-controls="site-navigation"
+          aria-expanded={isMenuOpen}
+        >
+          <span className="sr-only">Visa meny</span>
+          {isMenuOpen ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
+        </button>
+        <nav
+          id="site-navigation"
+          className={cn(
+            "hidden w-full flex-col gap-1 rounded-2xl bg-white/90 p-3 text-sm text-neutral-600 shadow-lg ring-1 ring-black/5 lg:flex lg:w-auto lg:flex-1 lg:flex-row lg:items-center lg:gap-1 lg:overflow-x-auto lg:whitespace-nowrap lg:rounded-full lg:bg-white/70 lg:px-3 lg:py-1.5",
+            isMenuOpen && "flex"
+          )}
+        >
           {nav.map((n) => {
             const isActive = pathname === n.href;
             return (
@@ -55,7 +78,7 @@ export function Navbar() {
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-3 py-1.5 transition duration-200 ease-out",
+                  "flex w-full items-center gap-2 rounded-full px-3 py-2 transition duration-200 ease-out lg:w-auto lg:justify-center",
                   isActive
                     ? "bg-primary-800 text-white shadow hover:text-neutral-300"
                     : "text-neutral-500 hover:text-neutral-900"
