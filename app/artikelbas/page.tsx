@@ -1,5 +1,6 @@
 "use client";
 
+import Image, { StaticImageData } from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -9,17 +10,21 @@ import {
   type PackagingFilterValue,
   PACKAGING_FILTER_VALUES,
 } from "@/lib/artikelbas-filters";
+import bulkImage from "./images/bulk.png";
+import packageImage from "./images/paket.png";
+import smallPackImage from "./images/sbpack.png";
+import bucketImage from "./images/storhink.png";
 
-const PACKAGING_FILTER_LABELS: Record<PackagingFilterValue, string> = {
-  "small-pack": "Småpack",
-  bucket: "Hink",
-  package: "Paket",
-  bulk: "Bulk",
+const PACKAGING_FILTER_MEDIA: Record<PackagingFilterValue, { label: string; image: StaticImageData }> = {
+  "small-pack": { label: "Småpack", image: smallPackImage },
+  bucket: { label: "Hink", image: bucketImage },
+  package: { label: "Paket", image: packageImage },
+  bulk: { label: "Bulk", image: bulkImage },
 };
 
 const PACKAGING_FILTER_OPTIONS = PACKAGING_FILTER_VALUES.map((value) => ({
   value,
-  label: PACKAGING_FILTER_LABELS[value],
+  ...PACKAGING_FILTER_MEDIA[value],
 }));
 
 type FamilyArticle = {
@@ -157,39 +162,44 @@ export default function ArtikelbasPage() {
               <legend className="text-sm font-medium text-neutral-700">
                 Ta endast med följande:
               </legend>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {PACKAGING_FILTER_OPTIONS.map((option) => {
-                  const inputId = `artikelbas-packaging-${option.value}`;
                   const isChecked = packagingFilters.includes(option.value);
 
                   return (
-                    <label
+                    <button
                       key={option.value}
-                      htmlFor={inputId}
-                      className="flex items-center gap-2 text-sm text-neutral-700"
-                    >
-                      <input
-                        id={inputId}
-                        type="checkbox"
-                        className="h-4 w-4 rounded border border-neutral-300 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-                        checked={isChecked}
-                        onChange={(event) => {
-                          const { checked } = event.target;
-                          setPackagingFilters((current) => {
-                            if (checked) {
-                              if (current.includes(option.value)) {
-                                return current;
-                              }
-
-                              return [...current, option.value];
-                            }
-
+                      type="button"
+                      aria-pressed={isChecked}
+                      onClick={() =>
+                        setPackagingFilters((current) => {
+                          if (current.includes(option.value)) {
                             return current.filter((value) => value !== option.value);
-                          });
-                        }}
-                      />
-                      {option.label}
-                    </label>
+                          }
+
+                          return [...current, option.value];
+                        })
+                      }
+                      className={`group flex w-full flex-col items-center gap-3 rounded-xl border bg-white/80 p-3 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
+                        isChecked
+                          ? "border-neutral-900 ring-2 ring-neutral-900"
+                          : "border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="relative isolate aspect-square w-full max-w-[96px] overflow-hidden rounded-lg p-2 shadow-sm transition group-hover:shadow">
+                        {isChecked ? (
+                          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-neutral-900" aria-hidden />
+                        ) : null}
+                        <Image
+                          src={option.image}
+                          alt={option.label}
+                          className="h-full w-full object-contain"
+                          sizes="(min-width: 640px) 96px, 96px"
+                          priority
+                        />
+                      </div>
+                      <span className="text-center text-neutral-800">{option.label}</span>
+                    </button>
                   );
                 })}
               </div>
