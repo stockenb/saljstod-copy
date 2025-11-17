@@ -162,7 +162,7 @@ export default function ArtikelbasPage() {
               <legend className="text-sm font-medium text-neutral-700">
                 Ta endast med följande:
               </legend>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {PACKAGING_FILTER_OPTIONS.map((option) => {
                   const isChecked = packagingFilters.includes(option.value);
 
@@ -180,16 +180,19 @@ export default function ArtikelbasPage() {
                           return [...current, option.value];
                         })
                       }
-                      className={`group flex w-full flex-col items-center gap-1.5 rounded-lg p-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
+                      className={`group relative flex w-full flex-col items-center gap-1.5 rounded-lg border text-[11px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
                         isChecked
-                          ? "bg-neutral-50"
-                          : "bg-transparent hover:bg-neutral-50/60"
+                          ? "border-primary bg-neutral-50 shadow-sm hover:shadow"
+                          : "border-neutral-200 bg-transparent hover:bg-neutral-50/60 hover:shadow-sm"
                       }`}
                     >
-                      <div className="relative isolate aspect-square w-full max-w-[72px] overflow-hidden p-1.5 transition">
-                        {isChecked ? (
-                          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-neutral-900" aria-hidden />
-                        ) : null}
+                      {isChecked ? (
+                        <span
+                          className="absolute right-2 bottom-4 h-2 w-2 rounded-full bg-primary"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <div className="relative isolate aspect-square w-full max-w-[64px] overflow-hidden p-1 transition">
                         <Image
                           src={option.image}
                           alt={option.label}
