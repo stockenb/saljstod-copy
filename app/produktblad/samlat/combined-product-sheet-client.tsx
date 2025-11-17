@@ -71,6 +71,26 @@ function deriveSizeValueFromTitle(
   prefixTokens: string[],
   suffixTokens: string[],
 ) {
+  const appendMillimeterSuffix = (sizeTokens: string[], suffix: string[]) => {
+    if (sizeTokens.length === 0) {
+      return sizeTokens;
+    }
+
+    const hasMeasurements = sizeTokens.some((token) => /\d/.test(token));
+    const hasMillimeter = sizeTokens.some(
+      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
+    );
+    const suffixMillimeter = suffix.find(
+      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
+    );
+
+    if (!hasMeasurements || hasMillimeter || !suffixMillimeter) {
+      return sizeTokens;
+    }
+
+    return [...sizeTokens, suffixMillimeter];
+  };
+
   const trimmedTitle = (title ?? "").trim();
 
   if (!trimmedTitle) {
@@ -78,16 +98,22 @@ function deriveSizeValueFromTitle(
   }
 
   const tokens = tokenizeTitle(trimmedTitle);
-  const primarySizeTokens = extractSizeTokens(tokens, prefixTokens, suffixTokens);
+  const primarySizeTokens = appendMillimeterSuffix(
+    extractSizeTokens(tokens, prefixTokens, suffixTokens),
+    suffixTokens,
+  );
 
   if (primarySizeTokens.length > 0 && primarySizeTokens.length < tokens.length) {
     return primarySizeTokens.join(" ").trim();
   }
 
   const fallbackAnalysis = analyzeProductTitles([{ title: trimmedTitle }]);
-  const fallbackSizeTokens = extractSizeTokens(
-    tokens,
-    fallbackAnalysis.prefixTokens,
+  const fallbackSizeTokens = appendMillimeterSuffix(
+    extractSizeTokens(
+      tokens,
+      fallbackAnalysis.prefixTokens,
+      fallbackAnalysis.suffixTokens,
+    ),
     fallbackAnalysis.suffixTokens,
   );
 
