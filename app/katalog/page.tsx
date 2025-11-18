@@ -3,9 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
+import {
+  collectSpecColumns,
+  formatSpecValue,
+  getSpecValueForColumn,
+  type ProductSpecification,
+  type SpecColumn,
+} from "@/lib/spec-table";
 import { cn } from "@/lib/utils";
-
-type ProductSpecification = { key: string; value: string };
 
 type Product = {
   articleNumber: string;
@@ -531,14 +536,48 @@ interface ImageAsset {
   format: "PNG" | "JPEG" | "WEBP";
 }
 
-async function loadImageAsset(path: string): Promise<ImageAsset> {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Kunde inte läsa in bilden: ${path}`);
-  }
+const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
 
-  const blob = await response.blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+function normalizeUrl(raw: string): string {
+  if (!raw) return raw;
+  if (raw.startsWith("data:image/")) return raw;
+
+  try {
+    const [base, rest] = raw.split(/([?#].*)/);
+    return encodeURI(base) + (rest ?? "");
+  } catch {
+    return raw.replace(/ /g, "%20");
+  }
+}
+
+function parseImageDataUrl(dataUrl: string): Pick<ImageAsset, "dataUrl" | "format"> {
+  const formatMatch = dataUrl.match(/^data:image\/(png|jpe?g|webp)/i);
+  const format = (formatMatch?.[1] ?? "png").toLowerCase();
+  if (format === "jpg" || format === "jpeg") {
+    return { dataUrl, format: "JPEG" };
+  }
+  if (format === "webp") {
+    return { dataUrl, format: "WEBP" };
+  }
+  return { dataUrl, format: "PNG" };
+}
+
+async function measureImage(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const imageElement = document.createElement("img");
+    imageElement.onload = () => {
+      resolve({
+        width: imageElement.naturalWidth,
+        height: imageElement.naturalHeight,
+      });
+    };
+    imageElement.onerror = () => reject(new Error("Kunde inte läsa bilddimensioner"));
+    imageElement.src = dataUrl;
+  });
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       if (typeof reader.result === "string") {
@@ -550,33 +589,65 @@ async function loadImageAsset(path: string): Promise<ImageAsset> {
     reader.onerror = () => reject(reader.error ?? new Error("Okänt fel vid läsning av bild"));
     reader.readAsDataURL(blob);
   });
+}
 
-  const { width, height } = await new Promise<{ width: number; height: number }>(
-    (resolve, reject) => {
-      const imageElement = document.createElement("img");
-      imageElement.onload = () => {
-        resolve({
-          width: imageElement.naturalWidth,
-          height: imageElement.naturalHeight,
-        });
-      };
-      imageElement.onerror = () => reject(new Error("Kunde inte läsa bilddimensioner"));
-      imageElement.src = dataUrl;
-    },
-  );
+async function fetchImageViaProxy(src: string): Promise<Pick<ImageAsset, "dataUrl" | "format"> | null> {
+  try {
+    const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(src)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      return null;
+    }
 
-  let format: ImageAsset["format"] = "JPEG";
-  if (blob.type.includes("png")) {
-    format = "PNG";
-  } else if (blob.type.includes("webp")) {
-    format = "WEBP";
+    const data = (await response.json().catch(() => null)) as { dataUrl?: string } | null;
+    if (!data?.dataUrl) return null;
+
+    return parseImageDataUrl(data.dataUrl);
+  } catch (error) {
+    console.error("Kunde inte proxy-ladda bilden", error);
+    return null;
+  }
+}
+
+async function fetchImageDirect(src: string): Promise<Pick<ImageAsset, "dataUrl" | "format"> | null> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    const dataUrl = await blobToDataUrl(blob);
+    return parseImageDataUrl(dataUrl);
+  } catch (error) {
+    console.warn("Kunde inte läsa in bilden direkt", error);
+    return null;
+  }
+}
+
+async function loadImageAsset(path: string): Promise<ImageAsset> {
+  const src = normalizeUrl(path);
+  if (!src) {
+    throw new Error("Ingen bild angiven");
   }
 
+  let imageData: Pick<ImageAsset, "dataUrl" | "format"> | null = null;
+  if (src.startsWith("data:image/")) {
+    imageData = parseImageDataUrl(src);
+  } else if (REMOTE_IMAGE_PATTERN.test(src)) {
+    imageData = (await fetchImageViaProxy(src)) ?? (await fetchImageDirect(src));
+  } else {
+    imageData = await fetchImageDirect(src);
+  }
+
+  if (!imageData) {
+    throw new Error(`Kunde inte läsa in bilden: ${src}`);
+  }
+
+  const dimensions = await measureImage(imageData.dataUrl);
+
   return {
-    dataUrl,
-    width,
-    height,
-    format,
+    ...imageData,
+    ...dimensions,
   };
 }
 
@@ -621,9 +692,9 @@ async function ensurePoppinsFonts(doc: jsPDF) {
     ]);
 
     doc.addFileToVFS(POPPINS_FONT_FILES.regular, regular);
-    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal");
+    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal", "Identity-H");
     doc.addFileToVFS(POPPINS_FONT_FILES.semiBold, semiBold);
-    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold");
+    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold", "Identity-H");
 
     return true;
   } catch (error) {
@@ -644,76 +715,23 @@ function useIndeterminateCheckbox(isIndeterminate: boolean) {
   return setElement;
 }
 
-function normalizeSpecKey(key: string): string {
-  return key
-    .normalize("NFKC")
-    .toLocaleLowerCase("sv-SE")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+function addPageNumbers(doc: jsPDF, font: string, textColor: [number, number, number]) {
+  const pageCount = doc.getNumberOfPages();
+  if (!pageCount) return;
 
-function isPackagingCount(key: string): boolean {
-  const normalized = normalizeSpecKey(key);
-  return normalized.includes("antal i prim") || normalized === "antal i primärförpackning";
-}
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    const size = doc.internal.pageSize as unknown as
+      | { getWidth: () => number; getHeight: () => number }
+      | { width: number; height: number };
+    const pageWidth = "getWidth" in size ? size.getWidth() : size.width;
+    const pageHeight = "getHeight" in size ? size.getHeight() : size.height;
 
-function isEanKey(key: string): boolean {
-  const normalized = normalizeSpecKey(key);
-  return normalized.startsWith("ean");
-}
-
-function isWeightKey(key: string): boolean {
-  return normalizeSpecKey(key) === "vikt";
-}
-
-function shouldIncludeSpecColumn(spec: ProductSpecification): boolean {
-  if (!spec.key) return false;
-  if (isEanKey(spec.key) || isWeightKey(spec.key)) return false;
-
-  if (isPackagingCount(spec.key)) {
-    const normalizedValue = spec.value
-      .toString()
-      .replace(/,/g, ".")
-      .replace(/[^0-9.]/g, "")
-      .trim();
-    const numeric = Number.parseFloat(normalizedValue || "");
-    if (!Number.isNaN(numeric) && numeric === 1) {
-      return false;
-    }
+    doc.setFont(font, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(`${page} / ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: "center" });
   }
-
-  return true;
-}
-
-function collectVariantSpecLabels(product: CatalogProduct): string[] {
-  const labels: string[] = [];
-  const items = product.variants.length ? product.variants : [product];
-
-  items.forEach((item) => {
-    item.specs.forEach((spec) => {
-      if (!shouldIncludeSpecColumn(spec)) {
-        return;
-      }
-      const normalizedKey = normalizeSpecKey(spec.key);
-      if (spec.key && !labels.some((label) => normalizeSpecKey(label) === normalizedKey)) {
-        labels.push(spec.key);
-      }
-    });
-  });
-
-  return labels.slice(0, 8);
-}
-
-function getSpecValue(variant: Product, label: string): string {
-  const normalizedLabel = normalizeSpecKey(label);
-  if (!shouldIncludeSpecColumn({ key: label, value: "" })) {
-    return "";
-  }
-
-  const match = variant.specs.find(
-    (spec) => normalizeSpecKey(spec.key) === normalizedLabel && shouldIncludeSpecColumn(spec),
-  );
-  return match?.value ?? "";
 }
 
 async function generateCatalogPdf(
@@ -758,12 +776,6 @@ async function generateCatalogPdf(
     doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
     doc.text(product.title, pageMarginX, cursorY);
     cursorY += 6;
-
-    doc.setFont(baseFont, normalStyle);
-    doc.setFontSize(9);
-    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-    doc.text(`Artikelnummer: ${product.articleNumber}`, pageMarginX, cursorY);
-    cursorY += 5;
 
     const descriptionWidth = contentWidth * 0.6;
     const imageMaxWidth = contentWidth * 0.35;
@@ -810,13 +822,13 @@ async function generateCatalogPdf(
       cursorY = Math.max(cursorY, imageBottom + 4);
     }
 
-    const specLabels = collectVariantSpecLabels(product);
     const rows = product.variants.length ? product.variants : [product];
-    const tableHead = ["Artikelnummer", "Benämning", ...specLabels];
+    const specColumns: SpecColumn[] = collectSpecColumns(rows);
+    const tableHead = ["Artikelnummer", "Benämning", ...specColumns.map((column) => column.label)];
     const tableBody = rows.map((row) => [
       row.articleNumber,
       row.title,
-      ...specLabels.map((label) => getSpecValue(row, label)),
+      ...specColumns.map((column) => formatSpecValue(getSpecValueForColumn(row, column))),
     ]);
 
     if (tableBody.length > 0) {
@@ -973,6 +985,8 @@ async function generateCatalogPdf(
       companyY += 7;
     });
   }
+
+  addPageNumbers(doc, baseFont, slateText);
 
   doc.save("nils-ahlgren-katalog.pdf");
 }
