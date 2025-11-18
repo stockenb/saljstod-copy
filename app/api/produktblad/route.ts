@@ -74,15 +74,22 @@ function normalizeSpecs(node: RawSpecNode): { key: string; value: string }[] {
   };
 
   const appendFromObject = (obj: Record<string, unknown>) => {
-    if ("key" in obj && "value" in obj) {
-      const key = String(obj.key ?? "");
-      const value = String(obj.value ?? "");
-      pushSpec(key, value);
+    if (("key" in obj || "Key" in obj) && ("value" in obj || "Value" in obj)) {
+      const key = String((obj as Record<string, unknown>).key ?? obj.Key ?? "");
+      const unit = (obj as Record<string, unknown>).unit ?? obj.Unit;
+      const value = String((obj as Record<string, unknown>).value ?? obj.Value ?? "");
+      const valueWithUnit = unit ? `${value} ${String(unit)}` : value;
+      pushSpec(key, valueWithUnit);
       return;
     }
 
     if ("specification" in obj && Object.keys(obj).length === 1) {
       appendNode(obj.specification as RawSpecNode);
+      return;
+    }
+
+    if ("Specification" in obj && Object.keys(obj).length === 1) {
+      appendNode(obj.Specification as RawSpecNode);
       return;
     }
 
@@ -135,18 +142,115 @@ function normalizeSpecs(node: RawSpecNode): { key: string; value: string }[] {
   return specs;
 }
 
+function parseWeight(weight: unknown): string {
+  if (weight === null || weight === undefined) {
+    return "";
+  }
+
+  if (typeof weight === "string" || typeof weight === "number") {
+    return String(weight).trim();
+  }
+
+  if (typeof weight === "object") {
+    const obj = weight as Record<string, unknown>;
+    const value = obj["#text"] ?? obj.value ?? obj.Value ?? "";
+    const unit = obj["@_unit"] ?? obj.unit ?? obj.Unit ?? "";
+
+    const text = String(value ?? "").trim();
+    const normalizedUnit = String(unit ?? "").trim();
+
+    if (!text) {
+      return "";
+    }
+
+    return normalizedUnit ? `${text} ${normalizedUnit}` : text;
+  }
+
+  return "";
+}
+
+function looksLikeProduct(node: Record<string, unknown>): boolean {
+  return (
+    "Name" in node ||
+    "Link" in node ||
+    "Image" in node ||
+    "FullDescription" in node ||
+    "title" in node ||
+    "link" in node ||
+    "image_link" in node
+  );
+}
+
+function collectProducts(node: unknown): Record<string, unknown>[] {
+  const products: Record<string, unknown>[] = [];
+
+  const visit = (value: unknown) => {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (typeof value !== "object") {
+      return;
+    }
+
+    const obj = value as Record<string, unknown>;
+
+    if ("Product" in obj) {
+      visit(obj.Product);
+    }
+
+    if (looksLikeProduct(obj)) {
+      products.push(obj);
+    }
+
+    Object.entries(obj).forEach(([key, entry]) => {
+      if (key === "Product") {
+        return;
+      }
+      visit(entry);
+    });
+  };
+
+  visit(node);
+
+  return products;
+}
+
+function getArticleNumbers(item: Record<string, unknown>): string[] {
+  const values = [
+    item["@_sku"],
+    item.sku,
+    item["@_id"],
+    item.id,
+  ];
+
+  return values
+    .map((value) => String(value ?? "").trim())
+    .filter((value) => value.length > 0);
+}
+
 function toProduct(item: Record<string, unknown>): NormalizedProduct {
   const specs = normalizeSpecs(
-    (item.specifications as RawSpecNode) ?? (item.specifikation as RawSpecNode)
+    (item.specifications as RawSpecNode) ??
+      (item.specifikation as RawSpecNode) ??
+      (item.Specifications as RawSpecNode) ??
+      (item.Specification as RawSpecNode)
   );
 
   return {
-    articleNumber: String(item.id ?? ""),
-    title: String(item.title ?? ""),
-    link: String(item.link ?? ""),
-    image: String(item.image_link ?? ""),
-    description: String(item.full_description ?? ""),
-    weight: String(item.shipping_weight ?? ""),
+    articleNumber: String(
+      item.sku ?? item["@_sku"] ?? item.id ?? item["@_id"] ?? ""
+    ),
+    title: String(item.title ?? item.Name ?? ""),
+    link: String(item.link ?? item.Link ?? ""),
+    image: String(item.image_link ?? item.Image ?? ""),
+    description: String(item.full_description ?? item.FullDescription ?? ""),
+    weight: parseWeight(item.shipping_weight ?? item.Weight),
     specs,
   };
 }
@@ -158,6 +262,8 @@ export async function GET(req: NextRequest) {
   if (!articleNumber) {
     return NextResponse.json({ error: "Ange ett artikelnummer." }, { status: 400 });
   }
+
+  const trimmedArticleNumber = articleNumber.trim();
 
   try {
     const response = await fetch(FEED_URL, { next: { revalidate: 60 } });
@@ -177,21 +283,37 @@ export async function GET(req: NextRequest) {
       rss?: { channel?: { item?: Record<string, unknown> | Record<string, unknown>[] } };
     };
 
-    const itemsRaw = parsed?.rss?.channel?.item;
-    const items = normalizeArray(itemsRaw);
-    const product = items.find((item) => {
-      const productId = item?.id;
-      return productId !== undefined && String(productId) === articleNumber;
-    });
+    const productNodes = collectProducts(parsed);
+    const matchedProduct = productNodes.find((item) =>
+      getArticleNumbers(item).some((id) => id === trimmedArticleNumber)
+    );
 
-    if (!product) {
+    let normalized: NormalizedProduct | undefined;
+
+    if (matchedProduct) {
+      normalized = toProduct(matchedProduct);
+    }
+
+    if (!normalized) {
+      const itemsRaw = parsed?.rss?.channel?.item;
+      const items = normalizeArray(itemsRaw);
+      const legacyProduct = items.find((item) =>
+        getArticleNumbers(item as Record<string, unknown>).some(
+          (id) => id === trimmedArticleNumber
+        )
+      );
+
+      if (legacyProduct) {
+        normalized = toProduct(legacyProduct as Record<string, unknown>);
+      }
+    }
+
+    if (!normalized) {
       return NextResponse.json(
         { error: "Ingen artikel hittades i flödet." },
         { status: 404 }
       );
     }
-
-    const normalized = toProduct(product);
 
     return NextResponse.json({ product: normalized });
   } catch (error) {
