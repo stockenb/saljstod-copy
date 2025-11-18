@@ -1,8 +1,5 @@
-import path from "path";
-import { readFile } from "fs/promises";
-import { XMLParser } from "fast-xml-parser";
-
 import type { PackagingFilterValue } from "./artikelbas-filters";
+import { getAllProducts, type Product } from "./product-feed";
 
 export type ArtikelbasArticle = {
   articleNumber: string;
@@ -15,24 +12,8 @@ type CachedArticle = ArtikelbasArticle & {
   primaryPackaging: string | null;
 };
 
-const FEED_PATH = path.join(process.cwd(), "app", "artikelbas", "feed.xml");
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  parseTagValue: true,
-  trimValues: true,
-});
-
 let cachedArticles: CachedArticle[] | null = null;
 let cachePromise: Promise<CachedArticle[]> | null = null;
-
-function normalizeArray<T>(value: T | T[] | null | undefined): T[] {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
-}
 
 function normalizeTitle(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -52,39 +33,6 @@ function normalizePackaging(value: string | null | undefined): string | null {
   return value.normalize("NFKC").toLocaleLowerCase("sv-SE");
 }
 
-function getSpecifications(item: RawItem): string[] {
-  const rawSpecifications = item?.specifications;
-
-  if (!rawSpecifications) {
-    return [];
-  }
-
-  if (Array.isArray(rawSpecifications)) {
-    return rawSpecifications.flatMap((specification) =>
-      normalizeArray((specification as RawSpecifications)?.specification).map((value) =>
-        String(value),
-      ),
-    );
-  }
-
-  return normalizeArray(rawSpecifications.specification).map((value) =>
-    String(value),
-  );
-}
-
-function extractPrimaryPackaging(specifications: string[]): string | null {
-  const packagingEntry = specifications.find((specification) =>
-    /^Primärförpackning:/i.test(specification),
-  );
-
-  if (!packagingEntry) {
-    return null;
-  }
-
-  const [, value] = packagingEntry.split(/:\s*/, 2);
-  return value ? value.trim() : null;
-}
-
 const PACKAGING_FILTER_TARGETS: Record<
   Exclude<PackagingFilterValue, "bulk">,
   string
@@ -92,20 +40,6 @@ const PACKAGING_FILTER_TARGETS: Record<
   "small-pack": normalizePackaging("SB förpackning") ?? "sb förpackning",
   bucket: normalizePackaging("Hink") ?? "hink",
   package: normalizePackaging("Paket") ?? "paket",
-};
-
-type RawSpecifications = { specification?: unknown | unknown[] };
-
-type RawItem = Record<string, unknown> & {
-  specifications?: RawSpecifications | RawSpecifications[];
-};
-
-type ParsedFeed = {
-  rss?: {
-    channel?: {
-      item?: RawItem | RawItem[];
-    };
-  };
 };
 
 async function loadArticles(): Promise<CachedArticle[]> {
@@ -117,41 +51,23 @@ async function loadArticles(): Promise<CachedArticle[]> {
     return cachePromise;
   }
 
-  cachePromise = readFile(FEED_PATH, "utf8")
-    .then((xml) => xml.replace(/^\uFEFF/, ""))
-    .then((xml) => {
-      const parsed = parser.parse(xml) as ParsedFeed;
-      const rawItems = parsed?.rss?.channel?.item;
-      const items = normalizeArray(rawItems);
-
-      const articles = items
-        .map((item) => {
-          const articleNumber = item?.id;
-          const title = item?.title;
-          const link = item?.link;
-          const specifications = getSpecifications(item);
-          const primaryPackaging = extractPrimaryPackaging(specifications);
-
-          if (
-            articleNumber === undefined ||
-            title === undefined ||
-            link === undefined
-          ) {
-            return null;
-          }
-
-          const normalizedTitle = normalizeTitle(String(title));
+  cachePromise = getAllProducts()
+    .then((products) =>
+      products
+        .map((product: Product): CachedArticle => {
+          const normalizedTitle = normalizeTitle(product.title);
 
           return {
-            articleNumber: String(articleNumber),
+            articleNumber: product.articleNumber,
             title: normalizedTitle,
-            link: String(link),
+            link: product.link,
             searchTitle: normalizeSearchText(normalizedTitle),
-            primaryPackaging,
-          } satisfies CachedArticle;
+            primaryPackaging: product.primaryPackaging,
+          };
         })
-        .filter((article): article is CachedArticle => article !== null);
-
+        .filter((article) => article.articleNumber && article.title && article.link),
+    )
+    .then((articles) => {
       cachedArticles = articles;
       return articles;
     })
