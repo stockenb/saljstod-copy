@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { XMLParser } from "fast-xml-parser";
 
-const FEED_URL = "https://www.nilsahlgren.se/upload/googleshopping/products-feed.xml";
-
-type RawSpecNode =
-  | Record<string, unknown>
-  | Array<unknown>
-  | string
-  | number
-  | boolean
-  | null
-  | undefined;
+import { getProductByArticleNumber, type Product } from "@/lib/product-feed";
 
 type NormalizedProduct = {
   articleNumber: string;
@@ -21,238 +11,6 @@ type NormalizedProduct = {
   weight: string;
   specs: { key: string; value: string }[];
 };
-
-const SPEC_KEY_REPLACEMENTS: Record<string, string> = {
-  "Antal i primärförpackning": "Antal i primärförp.",
-  "Antal i sekundärförpackning": "Antal i sekundärförp.",
-  Primärförpackning: "Primärförp.",
-};
-
-
-function normalizeArray<T>(value: T | T[] | undefined): T[] {
-  if (!value) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
-}
-
-function normalizeSpecs(node: RawSpecNode): { key: string; value: string }[] {
-  const specs: { key: string; value: string }[] = [];
-
-  const pushSpec = (key: string, value: string) => {
-    const normalizedKey = key.trim() || "Specifikation";
-    const normalizedValue = value.trim();
-    const shortenedKey = SPEC_KEY_REPLACEMENTS[normalizedKey] ?? normalizedKey;
-
-    if (!normalizedValue) {
-      return;
-    }
-
-    specs.push({ key: shortenedKey, value: normalizedValue });
-  };
-
-  const pushFromText = (raw: string) => {
-    const text = raw.replace(/\s+/g, " ").trim();
-    if (!text) {
-      return;
-    }
-
-    const delimiterIndex = text.indexOf(":");
-    if (delimiterIndex === -1) {
-      pushSpec("Specifikation", text);
-      return;
-    }
-
-    const key = text.slice(0, delimiterIndex).trim();
-    const value = text.slice(delimiterIndex + 1).trim();
-    if (!key && !value) {
-      return;
-    }
-
-    pushSpec(key || "Specifikation", value || text);
-  };
-
-  const appendFromObject = (obj: Record<string, unknown>) => {
-    if (("key" in obj || "Key" in obj) && ("value" in obj || "Value" in obj)) {
-      const key = String((obj as Record<string, unknown>).key ?? obj.Key ?? "");
-      const unit = (obj as Record<string, unknown>).unit ?? obj.Unit;
-      const value = String((obj as Record<string, unknown>).value ?? obj.Value ?? "");
-      const valueWithUnit = unit ? `${value} ${String(unit)}` : value;
-      pushSpec(key, valueWithUnit);
-      return;
-    }
-
-    if ("specification" in obj && Object.keys(obj).length === 1) {
-      appendNode(obj.specification as RawSpecNode);
-      return;
-    }
-
-    if ("Specification" in obj && Object.keys(obj).length === 1) {
-      appendNode(obj.Specification as RawSpecNode);
-      return;
-    }
-
-    Object.entries(obj).forEach(([rawKey, value]) => {
-      if (value === null || value === undefined) {
-        return;
-      }
-
-      if (rawKey === "specification" || rawKey === "specifications") {
-        appendNode(value as RawSpecNode);
-        return;
-      }
-
-      if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean"
-      ) {
-        const key = rawKey
-          .replace(/[_-]+/g, " ")
-          .replace(/\b\w/g, (char) => char.toUpperCase());
-        pushSpec(key, String(value));
-        return;
-      }
-
-      appendNode(value as RawSpecNode);
-    });
-  };
-
-  const appendNode = (value: RawSpecNode) => {
-    if (value === null || value === undefined) {
-      return;
-    }
-
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      pushFromText(String(value));
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach((entry) => appendNode(entry as RawSpecNode));
-      return;
-    }
-
-    appendFromObject(value as Record<string, unknown>);
-  };
-
-  appendNode(node);
-
-  return specs;
-}
-
-function parseWeight(weight: unknown): string {
-  if (weight === null || weight === undefined) {
-    return "";
-  }
-
-  if (typeof weight === "string" || typeof weight === "number") {
-    return String(weight).trim();
-  }
-
-  if (typeof weight === "object") {
-    const obj = weight as Record<string, unknown>;
-    const value = obj["#text"] ?? obj.value ?? obj.Value ?? "";
-    const unit = obj["@_unit"] ?? obj.unit ?? obj.Unit ?? "";
-
-    const text = String(value ?? "").trim();
-    const normalizedUnit = String(unit ?? "").trim();
-
-    if (!text) {
-      return "";
-    }
-
-    return normalizedUnit ? `${text} ${normalizedUnit}` : text;
-  }
-
-  return "";
-}
-
-type ProductNode = { node: Record<string, unknown>; parents: Record<string, unknown>[] };
-
-function collectProductNodes(node: unknown): ProductNode[] {
-  const products: ProductNode[] = [];
-
-  const visit = (
-    value: unknown,
-    parentKey?: string,
-    productAncestors: Record<string, unknown>[] = []
-  ) => {
-    if (value === null || value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach((entry) => visit(entry, parentKey, productAncestors));
-      return;
-    }
-
-    if (typeof value !== "object") {
-      return;
-    }
-
-    const obj = value as Record<string, unknown>;
-    const isProduct = parentKey === "Product";
-
-    if (isProduct) {
-      products.push({ node: obj, parents: productAncestors });
-    }
-
-    const nextAncestors = isProduct ? [...productAncestors, obj] : productAncestors;
-
-    Object.entries(obj).forEach(([key, entry]) => {
-      visit(entry, key, nextAncestors);
-    });
-  };
-
-  visit(node);
-
-  return products;
-}
-
-function getArticleNumbers(item: Record<string, unknown>): string[] {
-  const values = [
-    item["@_sku"],
-    item.sku,
-    item["@_id"],
-    item.id,
-  ];
-
-  return values
-    .map((value) => String(value ?? "").trim())
-    .filter((value) => value.length > 0);
-}
-
-function extractDescription(item: Record<string, unknown>): string {
-  return String(item.full_description ?? item.FullDescription ?? "").trim();
-}
-
-function toProduct(
-  item: Record<string, unknown>,
-  fallbackDescription?: string
-): NormalizedProduct {
-  const specs = normalizeSpecs(
-    (item.specifications as RawSpecNode) ??
-      (item.specifikation as RawSpecNode) ??
-      (item.Specifications as RawSpecNode) ??
-      (item.Specification as RawSpecNode)
-  );
-
-  const description = extractDescription(item) || fallbackDescription || "";
-
-  return {
-    articleNumber: String(
-      item.sku ?? item["@_sku"] ?? item.id ?? item["@_id"] ?? ""
-    ),
-    title: String(item.title ?? item.Name ?? ""),
-    link: String(item.link ?? item.Link ?? ""),
-    image: String(item.image_link ?? item.Image ?? ""),
-    description,
-    weight: parseWeight(item.shipping_weight ?? item.Weight),
-    specs,
-  };
-}
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -265,59 +23,16 @@ export async function GET(req: NextRequest) {
   const trimmedArticleNumber = articleNumber.trim();
 
   try {
-    const response = await fetch(FEED_URL, { next: { revalidate: 60 } });
+    const product = await getProductByArticleNumber(trimmedArticleNumber);
 
-    if (!response.ok) {
-      throw new Error(`Feed-förfrågan misslyckades med status ${response.status}`);
-    }
-
-    const xml = await response.text();
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      removeNSPrefix: true,
-      parseTagValue: true,
-      trimValues: true,
-    });
-    const parsed = parser.parse(xml) as {
-      rss?: { channel?: { item?: Record<string, unknown> | Record<string, unknown>[] } };
-    };
-
-    const productNodes = collectProductNodes(parsed);
-    const matchedProduct = productNodes.find(({ node }) =>
-      getArticleNumbers(node).some((id) => id === trimmedArticleNumber)
-    );
-
-    let normalized: NormalizedProduct | undefined;
-
-    if (matchedProduct) {
-      const ancestorDescription = [...matchedProduct.parents]
-        .reverse()
-        .map((parent) => extractDescription(parent))
-        .find((text) => text.length > 0);
-
-      normalized = toProduct(matchedProduct.node, ancestorDescription);
-    }
-
-    if (!normalized) {
-      const itemsRaw = parsed?.rss?.channel?.item;
-      const items = normalizeArray(itemsRaw);
-      const legacyProduct = items.find((item) =>
-        getArticleNumbers(item as Record<string, unknown>).some(
-          (id) => id === trimmedArticleNumber
-        )
-      );
-
-      if (legacyProduct) {
-        normalized = toProduct(legacyProduct as Record<string, unknown>);
-      }
-    }
-
-    if (!normalized) {
+    if (!product) {
       return NextResponse.json(
         { error: "Ingen artikel hittades i flödet." },
         { status: 404 }
       );
     }
+
+    const normalized = normalizeProduct(product);
 
     return NextResponse.json({ product: normalized });
   } catch (error) {
@@ -327,4 +42,31 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+const SPEC_KEY_REPLACEMENTS: Record<string, string> = {
+  "Antal i primärförpackning": "Antal i primärförp.",
+  "Antal i sekundärförpackning": "Antal i sekundärförp.",
+  Primärförpackning: "Primärförp.",
+};
+
+function normalizeProduct(product: Product): NormalizedProduct {
+  return {
+    articleNumber: product.articleNumber,
+    title: product.title,
+    link: product.link,
+    image: product.image,
+    description: product.description,
+    weight: product.weight,
+    specs: normalizeSpecs(product.specs),
+  };
+}
+
+function normalizeSpecs(specs: Product["specs"]): { key: string; value: string }[] {
+  return specs
+    .map(({ key, value }) => ({
+      key: (SPEC_KEY_REPLACEMENTS[key] ?? key).trim() || "Specifikation",
+      value: value.trim(),
+    }))
+    .filter((spec) => spec.value);
 }
