@@ -169,28 +169,16 @@ function parseWeight(weight: unknown): string {
   return "";
 }
 
-function looksLikeProduct(node: Record<string, unknown>): boolean {
-  return (
-    "Name" in node ||
-    "Link" in node ||
-    "Image" in node ||
-    "FullDescription" in node ||
-    "title" in node ||
-    "link" in node ||
-    "image_link" in node
-  );
-}
-
-function collectProducts(node: unknown): Record<string, unknown>[] {
+function collectProductNodes(node: unknown): Record<string, unknown>[] {
   const products: Record<string, unknown>[] = [];
 
-  const visit = (value: unknown) => {
+  const visit = (value: unknown, parentKey?: string) => {
     if (value === null || value === undefined) {
       return;
     }
 
     if (Array.isArray(value)) {
-      value.forEach(visit);
+      value.forEach((entry) => visit(entry, parentKey));
       return;
     }
 
@@ -200,19 +188,12 @@ function collectProducts(node: unknown): Record<string, unknown>[] {
 
     const obj = value as Record<string, unknown>;
 
-    if ("Product" in obj) {
-      visit(obj.Product);
-    }
-
-    if (looksLikeProduct(obj)) {
+    if (parentKey === "Product") {
       products.push(obj);
     }
 
     Object.entries(obj).forEach(([key, entry]) => {
-      if (key === "Product") {
-        return;
-      }
-      visit(entry);
+      visit(entry, key);
     });
   };
 
@@ -283,7 +264,7 @@ export async function GET(req: NextRequest) {
       rss?: { channel?: { item?: Record<string, unknown> | Record<string, unknown>[] } };
     };
 
-    const productNodes = collectProducts(parsed);
+    const productNodes = collectProductNodes(parsed);
     const matchedProduct = productNodes.find((item) =>
       getArticleNumbers(item).some((id) => id === trimmedArticleNumber)
     );
