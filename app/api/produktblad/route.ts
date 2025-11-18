@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 
-const FEED_URL = "https://www.nilsahlgren.se/upload/googleshopping/chat-feed-sv.xml";
+const FEED_URL = "https://www.nilsahlgren.se/upload/googleshopping/products-feed.xml";
 
 type RawSpecNode =
   | Record<string, unknown>
