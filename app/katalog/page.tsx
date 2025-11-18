@@ -34,7 +34,6 @@ interface AppendixSection {
   description?: string;
 }
 
-const DEFAULT_ROOT_CATEGORY = "46";
 const KONCERN_SECTION_ID = "koncerninformation";
 
 const appendixSections: AppendixSection[] = [
@@ -179,14 +178,14 @@ export default function CatalogGeneratorPage() {
   useEffect(() => {
     let isCancelled = false;
     setIsLoadingCategories(true);
-    fetch(`/api/categories?parentId=${DEFAULT_ROOT_CATEGORY}`)
+    fetch(`/api/categories`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Kunde inte läsa kategorier");
         }
         return response.json();
       })
-      .then((data: { categories?: ProductCategory[] }) => {
+      .then((data: { categories?: ProductCategory[]; rootCategoryId?: string | null }) => {
         if (isCancelled) return;
         const nextCategories = data.categories ?? [];
         setCategories(nextCategories);
@@ -645,20 +644,76 @@ function useIndeterminateCheckbox(isIndeterminate: boolean) {
   return setElement;
 }
 
-function collectVariantSpecLabels(variants: Product[]): string[] {
+function normalizeSpecKey(key: string): string {
+  return key
+    .normalize("NFKC")
+    .toLocaleLowerCase("sv-SE")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPackagingCount(key: string): boolean {
+  const normalized = normalizeSpecKey(key);
+  return normalized.includes("antal i prim") || normalized === "antal i primärförpackning";
+}
+
+function isEanKey(key: string): boolean {
+  const normalized = normalizeSpecKey(key);
+  return normalized.startsWith("ean");
+}
+
+function isWeightKey(key: string): boolean {
+  return normalizeSpecKey(key) === "vikt";
+}
+
+function shouldIncludeSpecColumn(spec: ProductSpecification): boolean {
+  if (!spec.key) return false;
+  if (isEanKey(spec.key) || isWeightKey(spec.key)) return false;
+
+  if (isPackagingCount(spec.key)) {
+    const normalizedValue = spec.value
+      .toString()
+      .replace(/,/g, ".")
+      .replace(/[^0-9.]/g, "")
+      .trim();
+    const numeric = Number.parseFloat(normalizedValue || "");
+    if (!Number.isNaN(numeric) && numeric === 1) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function collectVariantSpecLabels(product: CatalogProduct): string[] {
   const labels: string[] = [];
-  variants.forEach((variant) => {
-    variant.specs.forEach((spec) => {
-      if (spec.key && !labels.includes(spec.key)) {
+  const items = product.variants.length ? product.variants : [product];
+
+  items.forEach((item) => {
+    item.specs.forEach((spec) => {
+      if (!shouldIncludeSpecColumn(spec)) {
+        return;
+      }
+      const normalizedKey = normalizeSpecKey(spec.key);
+      if (spec.key && !labels.some((label) => normalizeSpecKey(label) === normalizedKey)) {
         labels.push(spec.key);
       }
     });
   });
+
   return labels.slice(0, 8);
 }
 
 function getSpecValue(variant: Product, label: string): string {
-  return variant.specs.find((spec) => spec.key === label)?.value ?? "";
+  const normalizedLabel = normalizeSpecKey(label);
+  if (!shouldIncludeSpecColumn({ key: label, value: "" })) {
+    return "";
+  }
+
+  const match = variant.specs.find(
+    (spec) => normalizeSpecKey(spec.key) === normalizedLabel && shouldIncludeSpecColumn(spec),
+  );
+  return match?.value ?? "";
 }
 
 async function generateCatalogPdf(
@@ -690,40 +745,52 @@ async function generateCatalogPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - pageMarginX * 2;
 
-  for (const [index, product] of products.entries()) {
-    if (index > 0) {
+  let cursorY = pageMarginTop;
+
+  for (const product of products) {
+    if (cursorY > pageHeight - 60) {
       doc.addPage();
+      cursorY = pageMarginTop;
     }
 
-    let cursorY = pageMarginTop;
     doc.setFont(baseFont, boldStyle);
-    doc.setFontSize(18);
+    doc.setFontSize(14);
     doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
     doc.text(product.title, pageMarginX, cursorY);
-    cursorY += 8;
-
-    doc.setFont(baseFont, normalStyle);
-    doc.setFontSize(10);
-    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-    doc.text(`Artikelnummer: ${product.articleNumber}`, pageMarginX, cursorY);
     cursorY += 6;
 
-    const descriptionWidth = contentWidth * 0.55;
+    doc.setFont(baseFont, normalStyle);
+    doc.setFontSize(9);
+    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+    doc.text(`Artikelnummer: ${product.articleNumber}`, pageMarginX, cursorY);
+    cursorY += 5;
+
+    const descriptionWidth = contentWidth * 0.6;
+    const imageMaxWidth = contentWidth * 0.35;
     let imageHeight = 0;
+    let imageWidth = 0;
 
     if (product.image) {
       try {
         const image = await loadImageAsset(product.image);
-        const maxImageWidth = contentWidth * 0.4;
-        let imageWidth = Math.min(maxImageWidth, image.width / 4);
+        imageWidth = Math.min(imageMaxWidth, image.width / 4);
         imageHeight = (image.height / image.width) * imageWidth;
-        if (imageHeight > 90) {
-          imageHeight = 90;
+        if (imageHeight > 70) {
+          imageHeight = 70;
           imageWidth = (image.width / image.height) * imageHeight;
         }
         const imageX = pageMarginX + contentWidth - imageWidth;
         const imageY = cursorY;
-        doc.addImage(image.dataUrl, image.format, imageX, imageY, imageWidth, imageHeight, undefined, "FAST");
+        doc.addImage(
+          image.dataUrl,
+          image.format,
+          imageX,
+          imageY,
+          imageWidth,
+          imageHeight,
+          undefined,
+          "FAST",
+        );
       } catch (error) {
         console.warn("Kunde inte läsa produktbild", error);
       }
@@ -731,24 +798,25 @@ async function generateCatalogPdf(
 
     if (product.description) {
       doc.setFont(baseFont, normalStyle);
-      doc.setFontSize(11);
+      doc.setFontSize(9.5);
       doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
       const descriptionLines = doc.splitTextToSize(product.description, descriptionWidth);
       doc.text(descriptionLines, pageMarginX, cursorY);
-      cursorY += descriptionLines.length * 5.2 + 6;
+      cursorY += descriptionLines.length * 4.4 + 4;
     }
 
     if (imageHeight) {
-      cursorY = Math.max(cursorY, pageMarginTop + imageHeight + 6);
+      const imageBottom = cursorY < pageMarginTop + imageHeight ? pageMarginTop + imageHeight : cursorY;
+      cursorY = Math.max(cursorY, imageBottom + 4);
     }
 
-    const specLabels = collectVariantSpecLabels(product.variants);
-    const tableHead = ["Artikelnummer", "Benämning", "Vikt", ...specLabels];
-    const tableBody = product.variants.map((variant) => [
-      variant.articleNumber,
-      variant.title,
-      variant.weight,
-      ...specLabels.map((label) => getSpecValue(variant, label)),
+    const specLabels = collectVariantSpecLabels(product);
+    const rows = product.variants.length ? product.variants : [product];
+    const tableHead = ["Artikelnummer", "Benämning", ...specLabels];
+    const tableBody = rows.map((row) => [
+      row.articleNumber,
+      row.title,
+      ...specLabels.map((label) => getSpecValue(row, label)),
     ]);
 
     if (tableBody.length > 0) {
@@ -760,9 +828,9 @@ async function generateCatalogPdf(
         styles: {
           font: baseFont,
           fontStyle: normalStyle,
-          fontSize: 9,
+          fontSize: 8.5,
           textColor: slateText,
-          cellPadding: 2,
+          cellPadding: 1.8,
           lineColor: [226, 232, 240],
           lineWidth: 0.1,
         },
@@ -771,7 +839,7 @@ async function generateCatalogPdf(
           textColor: [255, 255, 255],
           font: baseFont,
           fontStyle: boldStyle,
-          fontSize: 9.5,
+          fontSize: 9,
           halign: "left",
         },
         alternateRowStyles: {
@@ -783,19 +851,20 @@ async function generateCatalogPdf(
 
       const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
       if (finalY) {
-        cursorY = finalY + 10;
+        cursorY = finalY + 6;
       }
     }
 
-    if (cursorY > pageHeight - 30) {
+    if (cursorY > pageHeight - 25) {
       doc.addPage();
       cursorY = pageMarginTop;
     }
 
     doc.setFont(baseFont, normalStyle);
-    doc.setFontSize(9.5);
+    doc.setFontSize(8.5);
     doc.setTextColor(slateText[0], slateText[1], slateText[2]);
     doc.text(product.link, pageMarginX, cursorY);
+    cursorY += 10;
   }
 
   const otherAppendices = options.appendices.filter((appendix) => appendix.id !== KONCERN_SECTION_ID);

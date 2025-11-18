@@ -1,14 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-import { getTopLevelCategories } from "@/lib/product-feed";
+import { getCategoryTree } from "@/lib/product-feed";
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const parentId = url.searchParams.get("parentId") ?? undefined;
-
+export async function GET() {
   try {
-    const categories = await getTopLevelCategories(parentId ?? undefined);
-    return NextResponse.json({ categories });
+    const categories = await getCategoryTree();
+    return NextResponse.json({ categories, rootCategoryId: null });
   } catch (error) {
     console.error("Kunde inte läsa kategorier", error);
     return NextResponse.json(
