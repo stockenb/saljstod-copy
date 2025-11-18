@@ -18,6 +18,16 @@ export type Product = {
   primaryPackaging: string | null;
 };
 
+export type ProductWithVariants = Product & { variants: Product[] };
+
+export type ProductCategory = {
+  id: string;
+  name: string;
+  parentId?: string;
+  children: ProductCategory[];
+  productSkus: string[];
+};
+
 type RawProduct = Record<string, unknown>;
 
 type ProductNode = { node: RawProduct; parents: RawProduct[] };
@@ -30,8 +40,17 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
-let cachedProducts: Product[] | null = null;
-let cachePromise: Promise<Product[]> | null = null;
+type CachedFeedData = {
+  products: Product[];
+  categories: ProductCategory[];
+  productIndex: Map<string, Product>;
+  parentBySku: Map<string, string | null>;
+  variantsByParentSku: Map<string, Product[]>;
+  categoryIndex: Map<string, ProductCategory>;
+};
+
+let cachedFeedData: CachedFeedData | null = null;
+let cachePromise: Promise<CachedFeedData> | null = null;
 
 function normalizeArray<T>(value: T | T[] | null | undefined): T[] {
   if (value === undefined || value === null) {
@@ -98,6 +117,10 @@ function collectProductNodes(node: unknown): ProductNode[] {
   visit(node);
 
   return products;
+}
+
+function getArticleNumber(node: RawProduct): string {
+  return getText(node["@_sku"] ?? node.sku ?? node["@_id"] ?? node.id);
 }
 
 function parseSpecifications(rawSpecs: unknown): ProductSpecification[] {
@@ -179,7 +202,7 @@ function extractDescription(product: RawProduct): string {
 }
 
 function toProduct(node: RawProduct, parents: RawProduct[]): Product | null {
-  const articleNumber = getText(node["@_sku"] ?? node.sku ?? node["@_id"] ?? node.id);
+  const articleNumber = getArticleNumber(node);
   const title = getText(node.Name ?? node.Title);
   const link = getText(node.Link ?? node.link);
 
@@ -210,9 +233,75 @@ function toProduct(node: RawProduct, parents: RawProduct[]): Product | null {
   };
 }
 
-async function loadProducts(): Promise<Product[]> {
-  if (cachedProducts) {
-    return cachedProducts;
+function parseCategoryNode(
+  categoryNode: RawProduct,
+  parentId?: string,
+): ProductCategory | null {
+  const id = getText(categoryNode["@_id"] ?? categoryNode.id);
+  const name = getText(categoryNode.Name ?? categoryNode.name);
+
+  if (!id || !name) {
+    return null;
+  }
+
+  const productsValue = (categoryNode.Products ?? categoryNode.products) as
+    | RawProduct
+    | RawProduct[]
+    | Record<string, unknown>
+    | undefined;
+  const productEntries = normalizeArray(
+    (productsValue as Record<string, unknown>)?.Product ?? productsValue,
+  );
+  const productSkus = productEntries
+    .map((entry) =>
+      entry && typeof entry === "object"
+        ? getArticleNumber(entry as RawProduct)
+        : "",
+    )
+    .filter((sku) => sku.length > 0);
+
+  const childCategoryValue = (categoryNode.Categories ?? categoryNode.categories) as
+    | RawProduct
+    | RawProduct[]
+    | Record<string, unknown>
+    | undefined;
+  const childEntries = normalizeArray(
+    (childCategoryValue as Record<string, unknown>)?.Category ??
+      childCategoryValue ??
+      categoryNode.Category,
+  );
+  const children = childEntries
+    .map((child) =>
+      child && typeof child === "object"
+        ? parseCategoryNode(child as RawProduct, id)
+        : null,
+    )
+    .filter((child): child is ProductCategory => child !== null);
+
+  return {
+    id,
+    name,
+    parentId,
+    children,
+    productSkus,
+  };
+}
+
+function indexCategories(
+  categories: ProductCategory[],
+  index: Map<string, ProductCategory>,
+) {
+  categories.forEach((category) => {
+    index.set(category.id, category);
+    if (category.children.length) {
+      indexCategories(category.children, index);
+    }
+  });
+}
+
+async function loadFeedData(): Promise<CachedFeedData> {
+  if (cachedFeedData) {
+    return cachedFeedData;
   }
 
   if (cachePromise) {
@@ -225,12 +314,72 @@ async function loadProducts(): Promise<Product[]> {
       const parsed = parser.parse(xml) as Record<string, unknown>;
       const nodes = collectProductNodes(parsed);
 
+      const productIndex = new Map<string, Product>();
+      const parentBySku = new Map<string, string | null>();
+
       const products = nodes
-        .map(({ node, parents }) => toProduct(node, parents))
+        .map(({ node, parents }) => {
+          const product = toProduct(node, parents);
+          if (!product) {
+            return null;
+          }
+
+          const parentSku = [...parents]
+            .map((parent) => getArticleNumber(parent))
+            .filter(Boolean)
+            .pop();
+
+          productIndex.set(product.articleNumber, product);
+          parentBySku.set(product.articleNumber, parentSku ?? null);
+          return product;
+        })
         .filter((product): product is Product => product !== null);
 
-      cachedProducts = products;
-      return products;
+      const variantsByParentSku = new Map<string, Product[]>();
+      parentBySku.forEach((parentSku, sku) => {
+        if (!parentSku) {
+          return;
+        }
+
+        const variant = productIndex.get(sku);
+        if (!variant) {
+          return;
+        }
+
+        const siblings = variantsByParentSku.get(parentSku) ?? [];
+        siblings.push(variant);
+        variantsByParentSku.set(parentSku, siblings);
+      });
+
+      const categoryRoot =
+        ((parsed.Catalog as Record<string, unknown>)?.Website as Record<string, unknown>) ??
+        (parsed.catalog as Record<string, unknown>) ??
+        parsed;
+      const rawCategories = normalizeArray(
+        ((categoryRoot.Categories as Record<string, unknown>)?.Category ??
+          categoryRoot.Categories ??
+          categoryRoot.Category) as unknown,
+      );
+
+      const categories = rawCategories
+        .map((entry) =>
+          entry && typeof entry === "object" ? parseCategoryNode(entry as RawProduct) : null,
+        )
+        .filter((category): category is ProductCategory => category !== null);
+
+      const categoryIndex = new Map<string, ProductCategory>();
+      indexCategories(categories, categoryIndex);
+
+      cachedFeedData = {
+        products,
+        categories,
+        productIndex,
+        parentBySku,
+        variantsByParentSku,
+        categoryIndex,
+      };
+
+      return cachedFeedData;
     })
     .finally(() => {
       cachePromise = null;
@@ -240,7 +389,8 @@ async function loadProducts(): Promise<Product[]> {
 }
 
 export async function getAllProducts(): Promise<Product[]> {
-  return loadProducts();
+  const { products } = await loadFeedData();
+  return products;
 }
 
 export async function getProductByArticleNumber(
@@ -251,7 +401,7 @@ export async function getProductByArticleNumber(
     return null;
   }
 
-  const products = await loadProducts();
+  const { products } = await loadFeedData();
   return products.find((product) => product.articleNumber === trimmed) ?? null;
 }
 
@@ -259,7 +409,73 @@ export async function getProductsByArticleNumbers(
   articleNumbers: string[],
 ): Promise<Product[]> {
   const targets = new Set(articleNumbers.map((value) => value.trim()).filter(Boolean));
-  const products = await loadProducts();
+  const { products } = await loadFeedData();
 
   return products.filter((product) => targets.has(product.articleNumber));
+}
+
+export async function getCategoryTree(): Promise<ProductCategory[]> {
+  const { categories } = await loadFeedData();
+  return categories;
+}
+
+export async function getTopLevelCategories(
+  parentId?: string,
+): Promise<ProductCategory[]> {
+  const { categories, categoryIndex } = await loadFeedData();
+
+  if (!parentId) {
+    return categories;
+  }
+
+  const parentCategory = categoryIndex.get(parentId);
+  return parentCategory?.children ?? [];
+}
+
+export async function getProductsForCategory(
+  categoryId: string,
+  options: { includeDescendants?: boolean } = {},
+): Promise<ProductWithVariants[]> {
+  const { includeDescendants = false } = options;
+  const { categoryIndex, productIndex, variantsByParentSku, parentBySku } =
+    await loadFeedData();
+
+  const targetCategory = categoryIndex.get(categoryId);
+  if (!targetCategory) {
+    return [];
+  }
+
+  const skus = new Set<string>();
+
+  const visit = (category: ProductCategory) => {
+    category.productSkus.forEach((sku) => {
+      if (!sku) {
+        return;
+      }
+      if (parentBySku.get(sku) !== null) {
+        return;
+      }
+      skus.add(sku);
+    });
+
+    if (includeDescendants) {
+      category.children.forEach(visit);
+    }
+  };
+
+  visit(targetCategory);
+
+  return Array.from(skus)
+    .map((sku) => {
+      const product = productIndex.get(sku);
+      if (!product) {
+        return null;
+      }
+
+      return {
+        ...product,
+        variants: variantsByParentSku.get(product.articleNumber) ?? [],
+      } satisfies ProductWithVariants;
+    })
+    .filter((entry): entry is ProductWithVariants => entry !== null);
 }
