@@ -169,16 +169,22 @@ function parseWeight(weight: unknown): string {
   return "";
 }
 
-function collectProductNodes(node: unknown): Record<string, unknown>[] {
-  const products: Record<string, unknown>[] = [];
+type ProductNode = { node: Record<string, unknown>; parents: Record<string, unknown>[] };
 
-  const visit = (value: unknown, parentKey?: string) => {
+function collectProductNodes(node: unknown): ProductNode[] {
+  const products: ProductNode[] = [];
+
+  const visit = (
+    value: unknown,
+    parentKey?: string,
+    productAncestors: Record<string, unknown>[] = []
+  ) => {
     if (value === null || value === undefined) {
       return;
     }
 
     if (Array.isArray(value)) {
-      value.forEach((entry) => visit(entry, parentKey));
+      value.forEach((entry) => visit(entry, parentKey, productAncestors));
       return;
     }
 
@@ -187,13 +193,16 @@ function collectProductNodes(node: unknown): Record<string, unknown>[] {
     }
 
     const obj = value as Record<string, unknown>;
+    const isProduct = parentKey === "Product";
 
-    if (parentKey === "Product") {
-      products.push(obj);
+    if (isProduct) {
+      products.push({ node: obj, parents: productAncestors });
     }
 
+    const nextAncestors = isProduct ? [...productAncestors, obj] : productAncestors;
+
     Object.entries(obj).forEach(([key, entry]) => {
-      visit(entry, key);
+      visit(entry, key, nextAncestors);
     });
   };
 
@@ -215,13 +224,22 @@ function getArticleNumbers(item: Record<string, unknown>): string[] {
     .filter((value) => value.length > 0);
 }
 
-function toProduct(item: Record<string, unknown>): NormalizedProduct {
+function extractDescription(item: Record<string, unknown>): string {
+  return String(item.full_description ?? item.FullDescription ?? "").trim();
+}
+
+function toProduct(
+  item: Record<string, unknown>,
+  fallbackDescription?: string
+): NormalizedProduct {
   const specs = normalizeSpecs(
     (item.specifications as RawSpecNode) ??
       (item.specifikation as RawSpecNode) ??
       (item.Specifications as RawSpecNode) ??
       (item.Specification as RawSpecNode)
   );
+
+  const description = extractDescription(item) || fallbackDescription || "";
 
   return {
     articleNumber: String(
@@ -230,7 +248,7 @@ function toProduct(item: Record<string, unknown>): NormalizedProduct {
     title: String(item.title ?? item.Name ?? ""),
     link: String(item.link ?? item.Link ?? ""),
     image: String(item.image_link ?? item.Image ?? ""),
-    description: String(item.full_description ?? item.FullDescription ?? ""),
+    description,
     weight: parseWeight(item.shipping_weight ?? item.Weight),
     specs,
   };
@@ -265,14 +283,19 @@ export async function GET(req: NextRequest) {
     };
 
     const productNodes = collectProductNodes(parsed);
-    const matchedProduct = productNodes.find((item) =>
-      getArticleNumbers(item).some((id) => id === trimmedArticleNumber)
+    const matchedProduct = productNodes.find(({ node }) =>
+      getArticleNumbers(node).some((id) => id === trimmedArticleNumber)
     );
 
     let normalized: NormalizedProduct | undefined;
 
     if (matchedProduct) {
-      normalized = toProduct(matchedProduct);
+      const ancestorDescription = [...matchedProduct.parents]
+        .reverse()
+        .map((parent) => extractDescription(parent))
+        .find((text) => text.length > 0);
+
+      normalized = toProduct(matchedProduct.node, ancestorDescription);
     }
 
     if (!normalized) {
