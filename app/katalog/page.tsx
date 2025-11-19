@@ -633,6 +633,7 @@ function CategoryTree({
           expanded={expanded}
           onToggleCategory={onToggleCategory}
           onToggleExpand={onToggleExpand}
+          depth={depth}
         />
       ))}
     </ul>
@@ -645,6 +646,7 @@ interface CategoryTreeNodeProps {
   expanded: SelectionState;
   onToggleCategory: (category: ProductCategory, checked: boolean) => void;
   onToggleExpand: (id: string) => void;
+  depth?: number;
 }
 
 function CategoryTreeNode({
@@ -653,6 +655,7 @@ function CategoryTreeNode({
   expanded,
   onToggleCategory,
   onToggleExpand,
+  depth = 0,
 }: CategoryTreeNodeProps) {
   const descendantIds = useMemo(() => collectCategoryIds([category]), [category]);
   const checkedCount = descendantIds.filter((id) => selection[id]).length;
