@@ -1,4 +1,5 @@
 import type { PackagingFilterValue } from "./artikelbas-filters";
+import { matchesPackagingFilter } from "./packaging";
 import { getAllProducts, type Product } from "./product-feed";
 
 export type ArtikelbasArticle = {
@@ -24,23 +25,6 @@ function normalizeSearchText(value: string): string {
     .normalize("NFKC")
     .toLocaleLowerCase("sv-SE");
 }
-
-function normalizePackaging(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  return value.normalize("NFKC").toLocaleLowerCase("sv-SE");
-}
-
-const PACKAGING_FILTER_TARGETS: Record<
-  Exclude<PackagingFilterValue, "bulk">,
-  string
-> = {
-  "small-pack": normalizePackaging("SB förpackning") ?? "sb förpackning",
-  bucket: normalizePackaging("Hink") ?? "hink",
-  package: normalizePackaging("Paket") ?? "paket",
-};
 
 async function loadArticles(): Promise<CachedArticle[]> {
   if (cachedArticles) {
@@ -134,25 +118,6 @@ function getSearchMatcher(query: string, options: SearchMatcherOptions = {}) {
   return (value: string) => matcher.test(value);
 }
 
-function matchesPackagingFilter(
-  article: CachedArticle,
-  filter: PackagingFilterValue,
-): boolean {
-  const normalizedPackaging = normalizePackaging(article.primaryPackaging);
-
-  if (filter === "bulk") {
-    return article.articleNumber.startsWith("B");
-  }
-
-  const expected = PACKAGING_FILTER_TARGETS[filter];
-
-  if (!expected || !normalizedPackaging) {
-    return false;
-  }
-
-  return normalizedPackaging === expected;
-}
-
 export async function findArticles(
   query: string,
   options: ArticleSearchOptions = {},
@@ -179,7 +144,9 @@ export async function findArticles(
     .filter(
       (article) =>
         packagingFilters.length === 0 ||
-        packagingFilters.some((filter) => matchesPackagingFilter(article, filter)),
+        packagingFilters.some((filter) =>
+          matchesPackagingFilter(article, filter),
+        ),
     )
     .filter((article) => matcher(article.searchTitle))
     .map(({ searchTitle, primaryPackaging, ...visible }) => visible);

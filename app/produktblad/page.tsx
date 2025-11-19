@@ -337,9 +337,9 @@ async function ensurePoppinsFonts(doc: jsPDF) {
     const [regular, semiBold] = await Promise.all([loadFontBase64("regular"), loadFontBase64("semiBold")]);
 
     doc.addFileToVFS(POPPINS_FONT_FILES.regular, regular);
-    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal");
+    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal", "Identity-H");
     doc.addFileToVFS(POPPINS_FONT_FILES.semiBold, semiBold);
-    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold");
+    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold", "Identity-H");
 
     return true;
   } catch (error) {

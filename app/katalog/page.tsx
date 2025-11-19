@@ -1,191 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
+import { PACKAGING_FILTER_VALUES, type PackagingFilterValue } from "@/lib/artikelbas-filters";
+import {
+  collectSpecColumns,
+  formatSpecValue,
+  getSpecValueForColumn,
+  type ProductSpecification,
+  type SpecColumn,
+} from "@/lib/spec-table";
+import { normalizePdfText } from "@/lib/pdf-text";
 import { cn } from "@/lib/utils";
 
-interface CatalogSubcategory {
-  id: string;
-  name: string;
-  description?: string;
-}
+type Product = {
+  articleNumber: string;
+  title: string;
+  link: string;
+  image: string;
+  description: string;
+  weight: string;
+  specs: ProductSpecification[];
+  primaryPackaging: string | null;
+};
 
-interface CatalogCategory {
+type CatalogProduct = Product & { variants: Product[] };
+
+type ProductCategory = {
   id: string;
   name: string;
-  description?: string;
-  subcategories?: CatalogSubcategory[];
-}
+  parentId?: string;
+  children: ProductCategory[];
+  productSkus: string[];
+};
 
 interface AppendixSection {
   id: string;
   title: string;
   description?: string;
 }
-
-const placeholderCategories: CatalogCategory[] = [
-  {
-    id: "skruv",
-    name: "Skruv",
-    subcategories: [
-      {
-        id: "skruv-traskruv",
-        name: "Träskruv",
-      },
-      {
-        id: "skruv-byggskruv",
-        name: "Byggskruv",
-      },
-      {
-        id: "skruv-bandad-skruv",
-        name: "Bandad skruv",
-      },
-    ],
-  },
-  {
-    id: "bult",
-    name: "Bult",
-    subcategories: [
-      {
-        id: "bult-brickor",
-        name: "Brickor",
-      },
-      {
-        id: "bult-bult-kit",
-        name: "Bult-kit",
-      },
-      {
-        id: "bult-gangstanger",
-        name: "Gängstänger",
-      },
-      {
-        id: "bult-lyftoglor",
-        name: "Lyftöglor",
-      },
-      {
-        id: "bult-mutter",
-        name: "Mutter",
-      },
-      {
-        id: "bult-sexkantskruv",
-        name: "Sexkantskruv",
-      },
-      {
-        id: "bult-vagnsbult",
-        name: "Vagnsbult",
-      },
-    ],
-  },
-  {
-    id: "infastning",
-    name: "Infästning",
-    subcategories: [
-      {
-        id: "infastning-tung-ingfastning",
-        name: "Tung ingfästning",
-      },
-      {
-        id: "infastning-lattare-inf",
-        name: "Lättare infästning",
-      },
-      {
-        id: "infastning-karminfastning",
-        name: "Karminfästning",
-      },
-      {
-        id: "infastning-plugg-spik",
-        name: "Plugg & spik",
-      },
-      {
-        id: "infastning-tillbehor",
-        name: "Tillbehör infästning",
-      },
-    ],
-  },
-  {
-    id: "spik",
-    name: "Spik",
-    subcategories: [
-      {
-        id: "spik-spik",
-        name: "Spik",
-      },
-      {
-        id: "spik-bandad-spik",
-        name: "Bandad spik",
-      },
-    ],
-  },
-  {
-    id: "byggbeslag",
-    name: "Byggbeslag",
-    subcategories: [
-      {
-        id: "byggbeslag-balkskor",
-        name: "Balkskor",
-      },
-      {
-        id: "byggbeslag-vinkelbeslag",
-        name: "Vinkelbeslag",
-      },
-      {
-        id: "byggbeslag-spikplatar",
-        name: "Spikplåtar",
-      },
-      {
-        id: "byggbeslag-stolphallare-plintjarn",
-        name: "Stolphållare & plintjärn",
-      },
-      {
-        id: "byggbeslag-platband",
-        name: "Plåtband",
-      },
-      {
-        id: "byggbeslag-ovriga",
-        name: "Övriga byggbeslag",
-      },
-    ],
-  },
-  {
-    id: "ovrigt-bygg",
-    name: "Övrigt bygg",
-    subcategories: [
-      {
-        id: "ovrigt-bygg-hinkar",
-        name: "Hinkar",
-      },
-      {
-        id: "ovrigt-bygg-trad",
-        name: "Tråd",
-      },
-      {
-        id: "ovrigt-bygg-skottkarror",
-        name: "Skottkärror",
-      },
-      {
-        id: "ovrigt-bygg-nat",
-        name: "Nät",
-      },
-      {
-        id: "ovrigt-bygg-sprayfarg",
-        name: "Sprayfärg",
-      },
-      {
-        id: "ovrigt-bygg-skyddsutrustning",
-        name: "Skyddsutrustning",
-      },
-      {
-        id: "ovrigt-bygg-kapskivor-sagblad",
-        name: "Kapskivor & sågblad",
-      },
-      {
-        id: "ovrigt-bygg-troskeljarn",
-        name: "Tröskeljärn",
-      },
-    ],
-  },
-];
 
 const KONCERN_SECTION_ID = "koncerninformation";
 
@@ -205,22 +60,29 @@ const appendixSections: AppendixSection[] = [
     title: "Ahlgrens historia",
     description: "Information om Nils Ahlgren AB historia.",
   },
-   {
+  {
     id: "smapack",
     title: "Småpack",
     description: "Inkludera bilder och informatiom om SB-pack",
   },
-   {
+  {
     id: "miljo",
     title: "Kvalitet och miljö",
     description: "Sida om vårt miljöfokus.",
   },
-   {
+  {
     id: "packstugan",
     title: "Packstugan",
     description: "Information om packstugan",
   },
 ];
+
+const PACKAGING_LABELS: Record<PackagingFilterValue, string> = {
+  bucket: "Hink",
+  package: "Paket",
+  "small-pack": "Småpack",
+  bulk: "Bulk",
+};
 
 const POPPINS_FONT_URLS = {
   regular: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.ttf",
@@ -237,6 +99,7 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
 type SelectionState = Record<string, boolean>;
+type PackagingSelectionState = Record<PackagingFilterValue, boolean>;
 
 type PdfState =
   | { status: "idle" }
@@ -287,21 +150,27 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-function createInitialSelection(
-  categories: CatalogCategory[],
-  defaultValue = false
+function createSelectionFromCategories(
+  categories: ProductCategory[],
+  defaultValue = false,
 ): SelectionState {
-  const initial: SelectionState = {};
-  categories.forEach((category) => {
-    if (category.subcategories?.length) {
-      category.subcategories.forEach((sub) => {
-        initial[sub.id] = defaultValue;
-      });
-    } else {
-      initial[category.id] = defaultValue;
-    }
-  });
-  return initial;
+  const selection: SelectionState = {};
+  const visit = (category: ProductCategory) => {
+    selection[category.id] = defaultValue;
+    category.children.forEach(visit);
+  };
+  categories.forEach(visit);
+  return selection;
+}
+
+function collectCategoryIds(categories: ProductCategory[]): string[] {
+  const ids: string[] = [];
+  const visit = (category: ProductCategory) => {
+    ids.push(category.id);
+    category.children.forEach(visit);
+  };
+  categories.forEach(visit);
+  return ids;
 }
 
 function createAppendixSelection(sections: AppendixSection[]): SelectionState {
@@ -311,68 +180,153 @@ function createAppendixSelection(sections: AppendixSection[]): SelectionState {
   }, {});
 }
 
+function createExpandedState(categories: ProductCategory[]): SelectionState {
+  const expanded: SelectionState = {};
+
+  const visit = (category: ProductCategory, depth: number) => {
+    expanded[category.id] = depth === 0;
+    category.children.forEach((child) => visit(child, depth + 1));
+  };
+
+  categories.forEach((category) => visit(category, 0));
+  return expanded;
+}
+
+function createPackagingSelection(defaultValue = false): PackagingSelectionState {
+  return PACKAGING_FILTER_VALUES.reduce<PackagingSelectionState>((acc, value) => {
+    acc[value] = defaultValue;
+    return acc;
+  }, {} as PackagingSelectionState);
+}
+
+function parseSkuInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,;]+/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    ),
+  );
+}
+
 export default function CatalogGeneratorPage() {
-  const [categorySelection, setCategorySelection] = useState<SelectionState>(
-    () => createInitialSelection(placeholderCategories)
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categorySelection, setCategorySelection] = useState<SelectionState>({});
+  const [expandedCategories, setExpandedCategories] = useState<SelectionState>({});
+  const [appendixSelection, setAppendixSelection] = useState<SelectionState>(() =>
+    createAppendixSelection(appendixSections),
   );
-  const [appendixSelection, setAppendixSelection] = useState<SelectionState>(
-    () => createAppendixSelection(appendixSections)
+  const [packagingSelection, setPackagingSelection] = useState<PackagingSelectionState>(() =>
+    createPackagingSelection(false),
   );
+  const [includeSkuInput, setIncludeSkuInput] = useState("");
+  const [excludeSkuInput, setExcludeSkuInput] = useState("");
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [pdfState, setPdfState] = useState<PdfState>({ status: "idle" });
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setIsLoadingCategories(true);
+    fetch(`/api/categories`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Kunde inte läsa kategorier");
+        }
+        return response.json();
+      })
+      .then((data: { categories?: ProductCategory[]; rootCategoryId?: string | null }) => {
+        if (isCancelled) return;
+        const nextCategories = data.categories ?? [];
+        setCategories(nextCategories);
+        setCategorySelection(createSelectionFromCategories(nextCategories));
+        setExpandedCategories(createExpandedState(nextCategories));
+        setCategoryError(null);
+      })
+      .catch((error) => {
+        if (isCancelled) return;
+        console.error(error);
+        setCategories([]);
+        setCategorySelection({});
+        setCategoryError(
+          "Kunde inte läsa kategorier från produktflödet. Försök igen eller kontakta utvecklaren.",
+        );
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingCategories(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const allCategoryIds = useMemo(() => collectCategoryIds(categories), [categories]);
 
   const selectedCategoryCount = useMemo(
     () => Object.values(categorySelection).filter(Boolean).length,
-    [categorySelection]
+    [categorySelection],
   );
 
   const areAllCategoriesSelected = useMemo(() => {
-    const values = Object.values(categorySelection);
+    const values = allCategoryIds.map((id) => categorySelection[id]);
     return values.length > 0 && values.every(Boolean);
-  }, [categorySelection]);
+  }, [allCategoryIds, categorySelection]);
 
   const includeAllIndeterminate = useMemo(
     () => selectedCategoryCount > 0 && !areAllCategoriesSelected,
-    [areAllCategoriesSelected, selectedCategoryCount]
+    [areAllCategoriesSelected, selectedCategoryCount],
   );
 
-  const includeAllCheckboxRef = useIndeterminateCheckbox(
-    includeAllIndeterminate
-  );
+  const includeAllCheckboxRef = useIndeterminateCheckbox(includeAllIndeterminate);
 
   const selectedAppendixCount = useMemo(
     () => Object.values(appendixSelection).filter(Boolean).length,
-    [appendixSelection]
+    [appendixSelection],
   );
 
   const isGenerateDisabled =
-    selectedCategoryCount === 0 || pdfState.status === "loading";
+    selectedCategoryCount === 0 || pdfState.status === "loading" || isLoadingCategories;
 
   const isKoncernSelected = appendixSelection[KONCERN_SECTION_ID] ?? false;
 
   const handleToggleAllCategories = (checked: boolean) => {
-    setCategorySelection(() =>
-      createInitialSelection(placeholderCategories, checked)
-    );
+    setCategorySelection(() => {
+      const next: SelectionState = {};
+      allCategoryIds.forEach((id) => {
+        next[id] = checked;
+      });
+      return next;
+    });
   };
 
-  function toggleCategoryGroup(category: CatalogCategory, checked: boolean) {
+  const handleToggleExpand = (categoryId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !(prev[categoryId] ?? false),
+    }));
+  };
+
+  function toggleCategory(category: ProductCategory, checked: boolean) {
     setCategorySelection((prev) => {
-      const next = { ...prev };
-      if (category.subcategories?.length) {
-        category.subcategories.forEach((sub) => {
-          next[sub.id] = checked;
-        });
-      } else {
-        next[category.id] = checked;
-      }
+      const next = { ...prev } as SelectionState;
+      const apply = (node: ProductCategory) => {
+        next[node.id] = checked;
+        node.children.forEach(apply);
+      };
+      apply(category);
       return next;
     });
   }
 
-  function toggleSubcategory(id: string, checked: boolean) {
-    setCategorySelection((prev) => ({
+  function togglePackaging(filter: PackagingFilterValue, checked: boolean) {
+    setPackagingSelection((prev) => ({
       ...prev,
-      [id]: checked,
+      [filter]: checked,
     }));
   }
 
@@ -384,330 +338,50 @@ export default function CatalogGeneratorPage() {
   }
 
   async function handleGeneratePdf() {
-    setPdfState({ status: "loading", message: "Genererar PDF..." });
+    const selectedCategories = Object.entries(categorySelection)
+      .filter(([, value]) => value)
+      .map(([id]) => id);
+
+    if (selectedCategories.length === 0) {
+      setPdfState({ status: "error", message: "Välj minst en kategori först." });
+      return;
+    }
+
+    setPdfState({ status: "loading", message: "Hämtar artiklar och genererar PDF..." });
+
+    const selectedPackagingFilters = PACKAGING_FILTER_VALUES.filter(
+      (value) => packagingSelection[value],
+    );
+    const includeSkus = parseSkuInput(includeSkuInput);
+    const excludeSkus = parseSkuInput(excludeSkuInput);
 
     try {
-      const [{ jsPDF }] = await Promise.all([import("jspdf")]);
-
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const fontsLoaded = await ensurePoppinsFonts(doc);
-      const baseFont = fontsLoaded ? "Poppins" : "helvetica";
-      const boldStyle: "bold" = "bold";
-      const normalStyle: "normal" = "normal";
-
-      const brandBlue = hexToRgb("#023562");
-      const accentColor: [number, number, number] = [255, 83, 10];
-      const slateDark: [number, number, number] = [30, 41, 59];
-      const slateText: [number, number, number] = [71, 85, 105];
-
-      const pageMarginX = 18;
-      const pageMarginTop = 22;
-      const pageMarginBottom = 16;
-      const lineHeight = 5.5;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const contentWidth = pageWidth - pageMarginX * 2;
-      let cursorY = pageMarginTop;
-
-      const ensureSpace = (requiredSpace: number) => {
-        if (cursorY + requiredSpace > pageHeight - pageMarginBottom) {
-          doc.addPage();
-          cursorY = pageMarginTop;
-        }
-      };
-
-      const categoryBlocks = placeholderCategories
-        .map((category) => {
-          const subcategories = category.subcategories ?? [];
-          const selectedSubcategories = subcategories.filter(
-            (subcategory) => categorySelection[subcategory.id]
-          );
-          const includeWholeCategory =
-            !subcategories.length && categorySelection[category.id];
-
-          if (!includeWholeCategory && selectedSubcategories.length === 0) {
-            return null;
-          }
-
-          return { category, selectedSubcategories, includeWholeCategory };
-        })
-        .filter(
-          (
-            block
-          ): block is {
-            category: CatalogCategory;
-            selectedSubcategories: CatalogSubcategory[];
-            includeWholeCategory: boolean;
-          } => block !== null
-        );
-
-      const selectedAppendices = appendixSections.filter(
-        (section) => appendixSelection[section.id]
-      );
-
-      const [brandR, brandG, brandB] = brandBlue;
-      const headerHeight = 30;
-
-      doc.setFillColor(brandR, brandG, brandB);
-      doc.roundedRect(pageMarginX, cursorY, contentWidth, headerHeight, 5, 5, "F");
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFont(baseFont, boldStyle);
-      doc.setFontSize(19);
-      doc.text("Produktkatalog", pageMarginX + 10, cursorY + 12);
-
-      doc.setFont(baseFont, normalStyle);
-      doc.setFontSize(10.5);
-      doc.setTextColor(226, 232, 240);
-      doc.text(
-        `Genererad ${new Date().toLocaleDateString("sv-SE")}`,
-        pageMarginX + 10,
-        cursorY + 20
-      );
-
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.6);
-      doc.line(
-        pageMarginX + 10,
-        cursorY + headerHeight - 5,
-        pageMarginX + 56,
-        cursorY + headerHeight - 5
-      );
-
-      cursorY += headerHeight + 8;
-
-      doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-      doc.setFont(baseFont, normalStyle);
-      doc.setFontSize(11);
-      const introLines = doc.splitTextToSize(
-        "Detta är en planerad struktur för katalogen. När XML-filen kopplas in hämtas innehåll och sidlayout automatiskt.",
-        contentWidth
-      );
-      doc.text(introLines, pageMarginX, cursorY);
-      cursorY += introLines.length * lineHeight + 4;
-
-      if (categoryBlocks.length) {
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(13.5);
-        doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-        doc.text("Kategorier & avsnitt", pageMarginX, cursorY);
-        doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-        doc.setLineWidth(0.6);
-        doc.line(pageMarginX, cursorY + 2, pageMarginX + 44, cursorY + 2);
-
-        cursorY += 8;
-      }
-
-      const accentBarWidth = 2.5;
-
-      categoryBlocks.forEach((block) => {
-        const blockHeight = estimateCategoryBlockHeight(doc, {
-          baseFont,
-          boldStyle,
-          normalStyle,
-          category: block.category,
-          selectedSubcategories: block.selectedSubcategories,
-          includeWholeCategory: block.includeWholeCategory,
-          contentWidth,
-          lineHeight,
-          accentBarWidth,
-        });
-
-        ensureSpace(blockHeight + 8);
-
-        const blockTop = cursorY;
-        const paddingTop = 6;
-        const textX = pageMarginX + accentBarWidth + 5.5;
-
-        doc.setFillColor(247, 250, 252);
-        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 5, 5, "F");
-        doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(pageMarginX, blockTop, contentWidth, blockHeight, 5, 5, "S");
-
-        doc.setFillColor(brandR, brandG, brandB);
-        doc.rect(pageMarginX, blockTop, accentBarWidth, blockHeight, "F");
-
-        let textY = blockTop + paddingTop;
-
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(12.5);
-        doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-        doc.text(block.category.name, textX, textY);
-        textY += 5.5;
-
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(10.5);
-        doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-
-        if (block.category.description) {
-          const descriptionLines = doc.splitTextToSize(
-            block.category.description,
-            contentWidth - accentBarWidth - 12
-          );
-          doc.text(descriptionLines, textX, textY);
-          textY += descriptionLines.length * lineHeight + 2;
-        }
-
-        doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-
-        if (block.includeWholeCategory) {
-          doc.text("• Komplett kategori", textX, textY);
-          textY += lineHeight + 1.5;
-        }
-
-        block.selectedSubcategories.forEach((subcategory) => {
-          doc.text(`• ${subcategory.name}`, textX, textY);
-          textY += lineHeight;
-
-          if (subcategory.description) {
-            doc.setFont(baseFont, normalStyle);
-            doc.setFontSize(10);
-            doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-            const subLines = doc.splitTextToSize(
-              subcategory.description,
-              contentWidth - accentBarWidth - 16
-            );
-            doc.text(subLines, textX + 4, textY);
-            textY += subLines.length * lineHeight + 1.5;
-            doc.setFont(baseFont, normalStyle);
-            doc.setFontSize(10.5);
-            doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-          }
-        });
-
-        cursorY = blockTop + blockHeight + 6;
+      const response = await fetch("/api/catalog-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryIds: selectedCategories,
+          includeDescendants: true,
+          packagingFilters: selectedPackagingFilters,
+          includeSkus,
+          excludeSkus,
+        }),
       });
 
-      if (selectedAppendices.length) {
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(10.5);
-
-        const appendixEntries = selectedAppendices.map((appendix) => ({
-          appendix,
-          descriptionLines: appendix.description
-            ? doc.splitTextToSize(appendix.description, contentWidth - 10)
-            : null,
-        }));
-
-        const appendixHeight =
-          12 +
-          appendixEntries.reduce((height, entry) => {
-            const descriptionHeight = entry.descriptionLines
-              ? entry.descriptionLines.length * lineHeight
-              : 0;
-            return height + lineHeight + descriptionHeight + 1.5;
-          }, 0);
-
-        ensureSpace(appendixHeight + 4);
-
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(13);
-        doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-        doc.text("Bilagor", pageMarginX, cursorY);
-        doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-        doc.line(pageMarginX, cursorY + 2, pageMarginX + 30, cursorY + 2);
-        cursorY += 7;
-
-        appendixEntries.forEach(({ appendix, descriptionLines }) => {
-          doc.setFont(baseFont, normalStyle);
-          doc.setFontSize(10.5);
-          doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-          doc.text(`• ${appendix.title}`, pageMarginX, cursorY);
-          cursorY += lineHeight;
-
-          if (descriptionLines) {
-            doc.setFont(baseFont, normalStyle);
-            doc.setFontSize(9.5);
-            doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-            doc.text(descriptionLines, pageMarginX + 4, cursorY);
-            cursorY += descriptionLines.length * lineHeight + 1.5;
-          }
-        });
-
-        cursorY += 4;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Kunde inte läsa produkter.");
       }
 
-      if (isKoncernSelected) {
-        const koncernImage = await loadImageAsset("/koncern.jpg");
+      const data = (await response.json()) as { products?: CatalogProduct[] };
+      const products = data.products ?? [];
+      setCatalogProducts(products);
 
-        doc.addPage();
-        doc.setFillColor(2, 53, 98);
-        doc.rect(0, 0, pageWidth, 60, "F");
+      await generateCatalogPdf(products, {
+        appendices: appendixSections.filter((section) => appendixSelection[section.id]),
+        includeKoncern: isKoncernSelected,
+      });
 
-        doc.setTextColor(255, 255, 255);
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
-        doc.text("Bilaga", pageMarginX, 24);
-
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(24);
-        doc.text("Information om koncernen", pageMarginX, 38);
-
-        doc.setTextColor(30, 41, 59);
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(14);
-        doc.text("Koncernen", pageMarginX, 74);
-
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(11);
-        const introLines = doc.splitTextToSize(koncernIntro, contentWidth * 0.55);
-        doc.text(introLines, pageMarginX, 84);
-
-        const imageMaxWidth = contentWidth * 0.4;
-        let imageWidth = imageMaxWidth;
-        let imageHeight = (koncernImage.height / koncernImage.width) * imageWidth;
-
-        if (imageHeight > 110) {
-          imageHeight = 110;
-          imageWidth = (koncernImage.width / koncernImage.height) * imageHeight;
-        }
-        const imageX = pageWidth - pageMarginX - imageWidth;
-        const imageY = 70;
-
-        doc.addImage(
-          koncernImage.dataUrl,
-          koncernImage.format,
-          imageX,
-          imageY,
-          imageWidth,
-          imageHeight,
-          undefined,
-          "FAST"
-        );
-
-        let companyY = imageY + imageHeight + 10;
-        if (companyY < 120) {
-          companyY = 120;
-        }
-
-        koncernCompanies.forEach((company) => {
-          if (companyY > pageHeight - 40) {
-            doc.addPage();
-            companyY = pageMarginTop;
-          }
-
-          doc.setFont(baseFont, boldStyle);
-          doc.setFontSize(12);
-          doc.text(company.name, pageMarginX, companyY);
-          companyY += 6;
-
-          doc.setFont(baseFont, normalStyle);
-          doc.setFontSize(11);
-          const descriptionLines = doc.splitTextToSize(
-            company.description,
-            contentWidth
-          );
-          doc.text(descriptionLines, pageMarginX, companyY);
-          companyY += descriptionLines.length * lineHeight;
-
-          doc.setTextColor(2, 53, 98);
-          doc.text(company.website, pageMarginX, companyY);
-          doc.setTextColor(15, 23, 42);
-          companyY += lineHeight + 2;
-        });
-      }
-
-      doc.save("nils-ahlgren-katalog.pdf");
       setPdfState({
         status: "success",
         message: "PDF genererad. Kontakta utvecklaren för vidare anpassningar.",
@@ -726,26 +400,29 @@ export default function CatalogGeneratorPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Generera katalog</h1>
         <p className="text-sm text-neutral-600">
-          Hämta artikelinformation från produktflödet, justera innehållet och spara ett färdigt
-          produktblad som PDF.
+          Välj kategorier från produktflödet, inkludera eventuella bilagor och skapa en PDF-katalog med moderartiklar och deras varianter.
         </p>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
+        <div className="space-y-6">
+          <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <header className="max-w-xl space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">Välj kategorier</h2>
               <p className="text-sm text-neutral-600">
-                Kryssa i de kategorier du vill inkludera i din produktkatalog. Du kan även välja att inkludera allt genom att kryssa i rutan till höger.
+                Kryssa i de kategorier du vill inkludera i din produktkatalog. Underkategorier följer automatiskt med när en överordnad kategori väljs.
               </p>
+              {categoryError ? (
+                <p className="text-sm text-red-600">{categoryError}</p>
+              ) : null}
             </header>
             <label
               className={cn(
                 "flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium shadow-sm transition",
                 areAllCategoriesSelected
                   ? "border-sky-300 bg-sky-50 text-sky-800"
-                  : "border-neutral-200 bg-white text-slate-700 hover:border-sky-200 hover:bg-sky-50"
+                  : "border-neutral-200 bg-white text-slate-700 hover:border-sky-200 hover:bg-sky-50",
               )}
             >
               <input
@@ -754,35 +431,93 @@ export default function CatalogGeneratorPage() {
                 className="h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
                 checked={areAllCategoriesSelected}
                 onChange={(event) => handleToggleAllCategories(event.target.checked)}
+                disabled={isLoadingCategories || !allCategoryIds.length}
               />
               Inkludera allt
             </label>
           </div>
 
-          <div className="space-y-4">
-            {placeholderCategories.map((category) => {
-              const subcategories = category.subcategories ?? [];
-              const relevantIds = subcategories.length
-                ? subcategories.map((sub) => sub.id)
-                : [category.id];
-              const checkedCount = relevantIds.filter((id) => categorySelection[id]).length;
-              const allSelected = checkedCount === relevantIds.length && relevantIds.length > 0;
-              const partiallySelected = checkedCount > 0 && checkedCount < relevantIds.length;
-
-              return (
-                <CategoryCard
-                  key={category.id}
-                  category={category}
-                  isChecked={allSelected}
-                  isIndeterminate={partiallySelected}
-                  selection={categorySelection}
-                  onToggleCategory={toggleCategoryGroup}
-                  onToggleSubcategory={toggleSubcategory}
-                />
-              );
-            })}
-          </div>
+          {isLoadingCategories ? (
+            <p className="text-sm text-neutral-600">Laddar kategorier från produktflödet...</p>
+          ) : categories.length === 0 ? (
+            <p className="text-sm text-neutral-600">Inga kategorier kunde läsas in.</p>
+          ) : (
+            <div className="space-y-3">
+              <CategoryTree
+                categories={categories}
+                selection={categorySelection}
+                expanded={expandedCategories}
+                onToggleCategory={toggleCategory}
+                onToggleExpand={handleToggleExpand}
+              />
+            </div>
+          )}
         </section>
+
+          <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
+            <header className="space-y-1">
+              <h2 className="text-lg font-semibold text-slate-900">Filtrera artiklar</h2>
+              <p className="text-sm text-neutral-600">
+                Välj förpackningstyper och specificera artikelnummer som ska läggas till eller tas bort.
+              </p>
+            </header>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-slate-900">Förpackningstyper</p>
+              <p className="text-xs text-neutral-500">
+                Lämna tomt för att inkludera alla förpackningstyper.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {PACKAGING_FILTER_VALUES.map((filter) => (
+                  <label
+                    key={filter}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-medium shadow-sm transition",
+                      packagingSelection[filter]
+                        ? "border-sky-300 bg-sky-50 text-sky-900"
+                        : "border-transparent text-slate-700 hover:border-sky-200 hover:bg-sky-50",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      checked={packagingSelection[filter] ?? false}
+                      onChange={(event) => togglePackaging(filter, event.target.checked)}
+                    />
+                    {PACKAGING_LABELS[filter]}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-900">Inkludera artikelnummer</span>
+                <textarea
+                  value={includeSkuInput}
+                  onChange={(event) => setIncludeSkuInput(event.target.value)}
+                  className="min-h-[110px] w-full rounded-xl border border-neutral-200 bg-white/80 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Ex: 12345, 67890"
+                />
+                <span className="text-xs text-neutral-500">
+                  Separera med kommatecken, mellanslag eller radbrytningar.
+                </span>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-900">Exkludera artikelnummer</span>
+                <textarea
+                  value={excludeSkuInput}
+                  onChange={(event) => setExcludeSkuInput(event.target.value)}
+                  className="min-h-[110px] w-full rounded-xl border border-neutral-200 bg-white/80 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Ex: 560733"
+                />
+                <span className="text-xs text-neutral-500">
+                  Dessa artikelnummer tas alltid bort från katalogen.
+                </span>
+              </label>
+            </div>
+          </section>
+        </div>
 
         <aside className="space-y-6">
           <section className="space-y-4 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
@@ -800,7 +535,7 @@ export default function CatalogGeneratorPage() {
                     "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
                     appendixSelection[section.id]
                       ? "border-sky-300 bg-sky-50"
-                      : "border-transparent hover:border-sky-200 hover:bg-sky-50"
+                      : "border-transparent hover:border-sky-200 hover:bg-sky-50",
                   )}
                 >
                   <input
@@ -811,9 +546,9 @@ export default function CatalogGeneratorPage() {
                   />
                   <span>
                     <span className="block text-sm font-medium text-slate-900">{section.title}</span>
-                    {section.description && (
+                    {section.description ? (
                       <span className="mt-1 block text-sm text-neutral-600">{section.description}</span>
-                    )}
+                    ) : null}
                   </span>
                 </label>
               ))}
@@ -830,6 +565,9 @@ export default function CatalogGeneratorPage() {
               </li>
               <li>
                 <strong>{selectedAppendixCount}</strong> bilagor
+              </li>
+              <li>
+                <strong>{catalogProducts.length}</strong> moderartiklar i senaste genereringen
               </li>
             </ul>
             <Button
@@ -850,9 +588,7 @@ export default function CatalogGeneratorPage() {
               <p
                 className={cn(
                   "text-sm",
-                  pdfState.status === "error"
-                    ? "text-red-600"
-                    : "text-neutral-600"
+                  pdfState.status === "error" ? "text-red-600" : "text-neutral-600",
                 )}
               >
                 {pdfState.message}
@@ -865,79 +601,123 @@ export default function CatalogGeneratorPage() {
   );
 }
 
-interface CategoryCardProps {
-  category: CatalogCategory;
-  isChecked: boolean;
-  isIndeterminate: boolean;
+interface CategoryTreeProps {
+  categories: ProductCategory[];
   selection: SelectionState;
-  onToggleCategory: (category: CatalogCategory, checked: boolean) => void;
-  onToggleSubcategory: (subcategoryId: string, checked: boolean) => void;
+  expanded: SelectionState;
+  onToggleCategory: (category: ProductCategory, checked: boolean) => void;
+  onToggleExpand: (id: string) => void;
+  depth?: number;
 }
 
-function CategoryCard({
-  category,
-  isChecked,
-  isIndeterminate,
+function CategoryTree({
+  categories,
   selection,
+  expanded,
   onToggleCategory,
-  onToggleSubcategory,
-}: CategoryCardProps) {
-  const parentCheckboxRef = useIndeterminateCheckbox(isIndeterminate);
-
+  onToggleExpand,
+  depth = 0,
+}: CategoryTreeProps) {
   return (
-    <div className="space-y-4 rounded-2xl border border-neutral-200/70 bg-white/80 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-      <div className="flex items-start gap-3">
-        <input
-          ref={parentCheckboxRef}
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-          checked={isChecked}
-          onChange={(event) => onToggleCategory(category, event.target.checked)}
+    <ul
+      className={cn(
+        "space-y-3",
+        depth > 0 && "border-l border-dashed border-neutral-200 pl-4",
+      )}
+    >
+      {categories.map((category) => (
+        <CategoryTreeNode
+          key={category.id}
+          category={category}
+          selection={selection}
+          expanded={expanded}
+          onToggleCategory={onToggleCategory}
+          onToggleExpand={onToggleExpand}
+          depth={depth}
         />
-        <div className="space-y-1">
-          <span className="block text-base font-semibold text-slate-900">{category.name}</span>
-          {category.description && (
-            <span className="block text-sm text-neutral-600">{category.description}</span>
-          )}
-        </div>
-      </div>
-
-      {category.subcategories?.length ? (
-        <ul className="space-y-2 border-l border-dashed border-neutral-200 pl-5">
-          {category.subcategories.map((subcategory) => (
-            <li key={subcategory.id}>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-2 transition hover:border-sky-200 hover:bg-sky-50">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-                  checked={selection[subcategory.id] ?? false}
-                  onChange={(event) => onToggleSubcategory(subcategory.id, event.target.checked)}
-                />
-                <span>
-                  <span className="block text-sm font-medium text-slate-900">{subcategory.name}</span>
-                  {subcategory.description && (
-                    <span className="block text-sm text-neutral-600">{subcategory.description}</span>
-                  )}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
+      ))}
+    </ul>
   );
 }
 
-function useIndeterminateCheckbox(isIndeterminate: boolean) {
-  const [element, setElement] = useState<HTMLInputElement | null>(null);
+interface CategoryTreeNodeProps {
+  category: ProductCategory;
+  selection: SelectionState;
+  expanded: SelectionState;
+  onToggleCategory: (category: ProductCategory, checked: boolean) => void;
+  onToggleExpand: (id: string) => void;
+  depth?: number;
+}
 
-  useEffect(() => {
-    if (element) {
-      element.indeterminate = isIndeterminate;
-    }
-  }, [element, isIndeterminate]);
+function CategoryTreeNode({
+  category,
+  selection,
+  expanded,
+  onToggleCategory,
+  onToggleExpand,
+  depth = 0,
+}: CategoryTreeNodeProps) {
+  const descendantIds = useMemo(() => collectCategoryIds([category]), [category]);
+  const checkedCount = descendantIds.filter((id) => selection[id]).length;
+  const partiallySelected = checkedCount > 0 && checkedCount < descendantIds.length;
+  const checkboxRef = useIndeterminateCheckbox(partiallySelected);
+  const isExpanded = expanded[category.id] ?? false;
+  const showChildren = isExpanded && category.children.length > 0;
 
-  return setElement;
+  return (
+    <li className="rounded-2xl border border-neutral-200/70 bg-white/80 p-4 shadow-sm">
+      <div className="flex items-start gap-2">
+        {category.children.length ? (
+          <button
+            type="button"
+            className="mt-1 rounded-full p-1 text-slate-500 transition hover:bg-slate-100"
+            onClick={() => onToggleExpand(category.id)}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? "Fäll ihop underkategorier" : "Visa underkategorier"}
+          >
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 transition-transform",
+                isExpanded && "rotate-90",
+              )}
+            />
+          </button>
+        ) : (
+          <span className="mt-2 h-4 w-4" aria-hidden="true" />
+        )}
+        <label className="flex flex-1 cursor-pointer items-start gap-3">
+          <input
+            ref={checkboxRef}
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            checked={selection[category.id] ?? false}
+            onChange={(event) => onToggleCategory(category, event.target.checked)}
+          />
+          <span className="space-y-1">
+            <span className="block text-base font-semibold text-slate-900">{category.name}</span>
+            {category.productSkus.length ? (
+              <span className="block text-xs text-neutral-500">
+                {category.productSkus.length} moderartiklar i denna nivå
+              </span>
+            ) : null}
+          </span>
+        </label>
+      </div>
+
+      {showChildren ? (
+        <div className="mt-3">
+          <CategoryTree
+            categories={category.children}
+            selection={selection}
+            expanded={expanded}
+            onToggleCategory={onToggleCategory}
+            onToggleExpand={onToggleExpand}
+            depth={depth + 1}
+          />
+        </div>
+      ) : null}
+    </li>
+  );
 }
 
 interface ImageAsset {
@@ -947,14 +727,48 @@ interface ImageAsset {
   format: "PNG" | "JPEG" | "WEBP";
 }
 
-async function loadImageAsset(path: string): Promise<ImageAsset> {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Kunde inte läsa in bilden: ${path}`);
-  }
+const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
 
-  const blob = await response.blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+function normalizeUrl(raw: string): string {
+  if (!raw) return raw;
+  if (raw.startsWith("data:image/")) return raw;
+
+  try {
+    const [base, rest] = raw.split(/([?#].*)/);
+    return encodeURI(base) + (rest ?? "");
+  } catch {
+    return raw.replace(/ /g, "%20");
+  }
+}
+
+function parseImageDataUrl(dataUrl: string): Pick<ImageAsset, "dataUrl" | "format"> {
+  const formatMatch = dataUrl.match(/^data:image\/(png|jpe?g|webp)/i);
+  const format = (formatMatch?.[1] ?? "png").toLowerCase();
+  if (format === "jpg" || format === "jpeg") {
+    return { dataUrl, format: "JPEG" };
+  }
+  if (format === "webp") {
+    return { dataUrl, format: "WEBP" };
+  }
+  return { dataUrl, format: "PNG" };
+}
+
+async function measureImage(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const imageElement = document.createElement("img");
+    imageElement.onload = () => {
+      resolve({
+        width: imageElement.naturalWidth,
+        height: imageElement.naturalHeight,
+      });
+    };
+    imageElement.onerror = () => reject(new Error("Kunde inte läsa bilddimensioner"));
+    imageElement.src = dataUrl;
+  });
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       if (typeof reader.result === "string") {
@@ -966,107 +780,66 @@ async function loadImageAsset(path: string): Promise<ImageAsset> {
     reader.onerror = () => reject(reader.error ?? new Error("Okänt fel vid läsning av bild"));
     reader.readAsDataURL(blob);
   });
+}
 
-  const { width, height } = await new Promise<{ width: number; height: number }>(
-    (resolve, reject) => {
-      const imageElement = document.createElement("img");
-      imageElement.onload = () => {
-        resolve({
-          width: imageElement.naturalWidth,
-          height: imageElement.naturalHeight,
-        });
-      };
-      imageElement.onerror = () => reject(new Error("Kunde inte läsa bilddimensioner"));
-      imageElement.src = dataUrl;
+async function fetchImageViaProxy(src: string): Promise<Pick<ImageAsset, "dataUrl" | "format"> | null> {
+  try {
+    const proxyUrl = `/api/produktblad/image?src=${encodeURIComponent(src)}`;
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      return null;
     }
-  );
 
-  let format: ImageAsset["format"] = "JPEG";
-  if (blob.type.includes("png")) {
-    format = "PNG";
-  } else if (blob.type.includes("webp")) {
-    format = "WEBP";
+    const data = (await response.json().catch(() => null)) as { dataUrl?: string } | null;
+    if (!data?.dataUrl) return null;
+
+    return parseImageDataUrl(data.dataUrl);
+  } catch (error) {
+    console.error("Kunde inte proxy-ladda bilden", error);
+    return null;
   }
+}
+
+async function fetchImageDirect(src: string): Promise<Pick<ImageAsset, "dataUrl" | "format"> | null> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    const dataUrl = await blobToDataUrl(blob);
+    return parseImageDataUrl(dataUrl);
+  } catch (error) {
+    console.warn("Kunde inte läsa in bilden direkt", error);
+    return null;
+  }
+}
+
+async function loadImageAsset(path: string): Promise<ImageAsset> {
+  const src = normalizeUrl(path);
+  if (!src) {
+    throw new Error("Ingen bild angiven");
+  }
+
+  let imageData: Pick<ImageAsset, "dataUrl" | "format"> | null = null;
+  if (src.startsWith("data:image/")) {
+    imageData = parseImageDataUrl(src);
+  } else if (REMOTE_IMAGE_PATTERN.test(src)) {
+    imageData = (await fetchImageViaProxy(src)) ?? (await fetchImageDirect(src));
+  } else {
+    imageData = await fetchImageDirect(src);
+  }
+
+  if (!imageData) {
+    throw new Error(`Kunde inte läsa in bilden: ${src}`);
+  }
+
+  const dimensions = await measureImage(imageData.dataUrl);
 
   return {
-    dataUrl,
-    width,
-    height,
-    format,
+    ...imageData,
+    ...dimensions,
   };
-}
-
-interface EstimateCategoryOptions {
-  baseFont: string;
-  boldStyle: "bold";
-  normalStyle: "normal";
-  category: CatalogCategory;
-  selectedSubcategories: CatalogSubcategory[];
-  includeWholeCategory: boolean;
-  contentWidth: number;
-  lineHeight: number;
-  accentBarWidth: number;
-}
-
-function estimateCategoryBlockHeight(
-  doc: jsPDF,
-  options: EstimateCategoryOptions
-): number {
-  const {
-    baseFont,
-    boldStyle,
-    normalStyle,
-    category,
-    selectedSubcategories,
-    includeWholeCategory,
-    contentWidth,
-    lineHeight,
-    accentBarWidth,
-  } = options;
-
-  const previousFont = doc.getFont();
-  const previousFontSize = doc.getFontSize();
-
-  const paddingTop = 6;
-  const paddingBottom = 6;
-  let height = paddingTop;
-
-  doc.setFont(baseFont, boldStyle);
-  doc.setFontSize(12.5);
-  height += 5.5;
-
-  doc.setFont(baseFont, normalStyle);
-  doc.setFontSize(10.5);
-
-  if (category.description) {
-    const descriptionLines = doc.splitTextToSize(
-      category.description,
-      contentWidth - accentBarWidth - 12
-    );
-    height += descriptionLines.length * lineHeight + 2;
-  }
-
-  if (includeWholeCategory) {
-    height += lineHeight + 1.5;
-  }
-
-  selectedSubcategories.forEach((subcategory) => {
-    height += lineHeight;
-    if (subcategory.description) {
-      const subLines = doc.splitTextToSize(
-        subcategory.description,
-        contentWidth - accentBarWidth - 16
-      );
-      height += subLines.length * lineHeight + 1.5;
-    }
-  });
-
-  height += paddingBottom;
-
-  doc.setFont(previousFont.fontName, previousFont.fontStyle);
-  doc.setFontSize(previousFontSize);
-
-  return height;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -1110,13 +883,331 @@ async function ensurePoppinsFonts(doc: jsPDF) {
     ]);
 
     doc.addFileToVFS(POPPINS_FONT_FILES.regular, regular);
-    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal");
+    doc.addFont(POPPINS_FONT_FILES.regular, "Poppins", "normal", "Identity-H");
     doc.addFileToVFS(POPPINS_FONT_FILES.semiBold, semiBold);
-    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold");
+    doc.addFont(POPPINS_FONT_FILES.semiBold, "Poppins", "bold", "Identity-H");
 
     return true;
   } catch (error) {
     console.warn("Kunde inte ladda Poppins", error);
     return false;
   }
+}
+
+function useIndeterminateCheckbox(isIndeterminate: boolean) {
+  const [element, setElement] = useState<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (element) {
+      element.indeterminate = isIndeterminate;
+    }
+  }, [element, isIndeterminate]);
+
+  return setElement;
+}
+
+function addPageNumbers(doc: jsPDF, font: string, textColor: [number, number, number]) {
+  const pageCount = doc.getNumberOfPages();
+  if (!pageCount) return;
+
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    const size = doc.internal.pageSize as unknown as
+      | { getWidth: () => number; getHeight: () => number }
+      | { width: number; height: number };
+    const pageWidth = "getWidth" in size ? size.getWidth() : size.width;
+    const pageHeight = "getHeight" in size ? size.getHeight() : size.height;
+
+    doc.setFont(font, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(`${page} / ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+  }
+}
+
+async function generateCatalogPdf(
+  products: CatalogProduct[],
+  options: { appendices: AppendixSection[]; includeKoncern: boolean },
+) {
+  if (products.length === 0) {
+    throw new Error("Inga produkter att generera katalogn av.");
+  }
+
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const fontsLoaded = await ensurePoppinsFonts(doc);
+  const baseFont = fontsLoaded ? "Poppins" : "helvetica";
+  const boldStyle: "bold" = "bold";
+  const normalStyle: "normal" = "normal";
+
+  const brandBlue = hexToRgb("#023562");
+  const slateText: [number, number, number] = [71, 85, 105];
+  const slateDark: [number, number, number] = [30, 41, 59];
+
+  const pageMarginX = 18;
+  const pageMarginTop = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - pageMarginX * 2;
+
+  let cursorY = pageMarginTop;
+
+  for (const product of products) {
+    if (cursorY > pageHeight - 60) {
+      doc.addPage();
+      cursorY = pageMarginTop;
+    }
+
+    doc.setFont(baseFont, boldStyle);
+    doc.setFontSize(14);
+    doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+    doc.text(normalizePdfText(product.title), pageMarginX, cursorY);
+    cursorY += 6;
+
+    const blockStartY = cursorY;
+    const imageMaxWidth = contentWidth * 0.38;
+    const imageMaxHeight = 60;
+    const columnGap = 8;
+    let imageDimensions: { width: number; height: number } | null = null;
+
+    if (product.image) {
+      try {
+        const image = await loadImageAsset(product.image);
+        let imageWidth = Math.min(imageMaxWidth, image.width / 4);
+        if (!Number.isFinite(imageWidth) || imageWidth <= 0) {
+          imageWidth = imageMaxWidth;
+        }
+        let imageHeight = (image.height / image.width) * imageWidth;
+        if (!Number.isFinite(imageHeight) || imageHeight <= 0) {
+          imageHeight = imageMaxHeight;
+        }
+        if (imageHeight > imageMaxHeight) {
+          imageHeight = imageMaxHeight;
+          imageWidth = (image.width / image.height) * imageHeight;
+        }
+        imageDimensions = { width: imageWidth, height: imageHeight };
+        doc.addImage(
+          image.dataUrl,
+          image.format,
+          pageMarginX,
+          blockStartY,
+          imageWidth,
+          imageHeight,
+          undefined,
+          "FAST",
+        );
+      } catch (error) {
+        console.warn("Kunde inte läsa produktbild", error);
+      }
+    }
+
+    const hasImage = Boolean(imageDimensions);
+    const textX = hasImage ? pageMarginX + (imageDimensions?.width ?? 0) + columnGap : pageMarginX;
+    const minTextWidth = hasImage ? contentWidth * 0.45 : contentWidth;
+    const computedWidth = contentWidth - (hasImage ? (imageDimensions?.width ?? 0) + columnGap : 0);
+    const descriptionWidth = Math.max(minTextWidth, computedWidth > 0 ? computedWidth : minTextWidth);
+    let textBottom = blockStartY;
+    const sanitizedDescription = normalizePdfText(product.description);
+
+    if (sanitizedDescription) {
+      doc.setFont(baseFont, normalStyle);
+      doc.setFontSize(9.5);
+      doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+      const descriptionLines = doc.splitTextToSize(sanitizedDescription, descriptionWidth);
+      if (descriptionLines.length) {
+        doc.text(descriptionLines, textX, blockStartY);
+        textBottom = blockStartY + descriptionLines.length * 4.4;
+      }
+    }
+
+    const imageBottom = hasImage ? blockStartY + (imageDimensions?.height ?? 0) : blockStartY;
+    const blockBottom = Math.max(textBottom, imageBottom);
+    cursorY = (blockBottom === blockStartY ? blockStartY + 4 : blockBottom) + 6;
+
+    const rows = product.variants.length ? product.variants : [product];
+    const specColumns: SpecColumn[] = collectSpecColumns(rows);
+    const tableHead = [
+      "Artikelnummer",
+      "Benämning",
+      ...specColumns.map((column) => normalizePdfText(column.label)),
+    ];
+    const tableBody = rows.map((row) => [
+      normalizePdfText(row.articleNumber),
+      normalizePdfText(row.title),
+      ...specColumns.map((column) =>
+        normalizePdfText(formatSpecValue(getSpecValueForColumn(row, column))),
+      ),
+    ]);
+
+    if (tableBody.length > 0) {
+      autoTable(doc, {
+        startY: cursorY,
+        margin: { left: pageMarginX, right: pageMarginX },
+        head: [tableHead],
+        body: tableBody,
+        styles: {
+          font: baseFont,
+          fontStyle: normalStyle,
+          fontSize: 8.5,
+          textColor: slateText,
+          cellPadding: 1.8,
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: brandBlue,
+          textColor: [255, 255, 255],
+          font: baseFont,
+          fontStyle: boldStyle,
+          fontSize: 9,
+          halign: "left",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        tableLineColor: [226, 232, 240],
+        tableLineWidth: 0.1,
+      });
+
+      const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+      if (finalY) {
+        cursorY = finalY + 6;
+      }
+    }
+
+    if (cursorY > pageHeight - 25) {
+      doc.addPage();
+      cursorY = pageMarginTop;
+    }
+
+    doc.setFont(baseFont, normalStyle);
+    doc.setFontSize(8.5);
+    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+    doc.text(normalizePdfText(product.link), pageMarginX, cursorY);
+    cursorY += 10;
+  }
+
+  const otherAppendices = options.appendices.filter((appendix) => appendix.id !== KONCERN_SECTION_ID);
+
+  if (otherAppendices.length) {
+    doc.addPage();
+    doc.setFont(baseFont, boldStyle);
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("Bilagor", pageMarginX, pageMarginTop);
+
+    doc.setFont(baseFont, normalStyle);
+    doc.setFontSize(11);
+    doc.setTextColor(slateText[0], slateText[1], slateText[2]);
+
+    let cursorY = pageMarginTop + 8;
+    otherAppendices.forEach((appendix) => {
+      doc.text(`• ${normalizePdfText(appendix.title)}`, pageMarginX, cursorY);
+      cursorY += 5;
+      if (appendix.description) {
+        const lines = doc.splitTextToSize(
+          normalizePdfText(appendix.description),
+          contentWidth - 8,
+        );
+        doc.text(lines, pageMarginX + 4, cursorY);
+        cursorY += lines.length * 5 + 3;
+      }
+      cursorY += 2;
+      if (cursorY > pageHeight - 30) {
+        doc.addPage();
+        cursorY = pageMarginTop;
+      }
+    });
+  }
+
+  if (options.includeKoncern) {
+    const koncernImage = await loadImageAsset("/koncern.jpg");
+
+    doc.addPage();
+    doc.setFillColor(2, 53, 98);
+    doc.rect(0, 0, pageWidth, 60, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(baseFont, normalStyle);
+    doc.setFontSize(11);
+    doc.text("Bilaga", pageMarginX, 24);
+
+    doc.setFont(baseFont, boldStyle);
+    doc.setFontSize(24);
+    doc.text("Information om koncernen", pageMarginX, 38);
+
+    doc.setTextColor(30, 41, 59);
+    doc.setFont(baseFont, boldStyle);
+    doc.setFontSize(14);
+    doc.text("Koncernen", pageMarginX, 74);
+
+    doc.setFont(baseFont, normalStyle);
+    doc.setFontSize(11);
+    const introLines = doc.splitTextToSize(
+      normalizePdfText(koncernIntro),
+      contentWidth * 0.55,
+    );
+    doc.text(introLines, pageMarginX, 84);
+
+    const imageMaxWidth = contentWidth * 0.4;
+    let imageWidth = imageMaxWidth;
+    let imageHeight = (koncernImage.height / koncernImage.width) * imageWidth;
+
+    if (imageHeight > 110) {
+      imageHeight = 110;
+      imageWidth = (koncernImage.width / koncernImage.height) * imageHeight;
+    }
+    const imageX = pageMarginX + contentWidth - imageWidth;
+    const imageY = 70;
+
+    doc.addImage(
+      koncernImage.dataUrl,
+      koncernImage.format,
+      imageX,
+      imageY,
+      imageWidth,
+      imageHeight,
+      undefined,
+      "FAST",
+    );
+
+    let companyY = imageY + imageHeight + 10;
+    if (companyY < 120) {
+      companyY = 120;
+    }
+
+    koncernCompanies.forEach((company) => {
+      if (companyY > pageHeight - 40) {
+        doc.addPage();
+        companyY = pageMarginTop;
+      }
+
+      doc.setFont(baseFont, boldStyle);
+      doc.setFontSize(12);
+      doc.text(normalizePdfText(company.name), pageMarginX, companyY);
+      companyY += 6;
+
+      doc.setFont(baseFont, normalStyle);
+      doc.setFontSize(11);
+      const descriptionLines = doc.splitTextToSize(
+        normalizePdfText(company.description),
+        contentWidth,
+      );
+      doc.text(descriptionLines, pageMarginX, companyY);
+      companyY += descriptionLines.length * 5.5;
+
+      doc.setTextColor(2, 53, 98);
+      doc.text(normalizePdfText(company.website), pageMarginX, companyY);
+      doc.setTextColor(15, 23, 42);
+      companyY += 7;
+    });
+  }
+
+  addPageNumbers(doc, baseFont, slateText);
+
+  doc.save("nils-ahlgren-katalog.pdf");
 }
