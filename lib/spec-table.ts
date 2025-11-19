@@ -22,6 +22,8 @@ const SPEC_LABEL_MAP: Record<string, string> = {
   "sb förpackning": "Småpack",
 };
 
+const PRIORITY_SPEC_KEY_ORDER = [normalizeSpecKey("Storlek")];
+
 export function normalizeSpecKey(key: string): string {
   return key
     .normalize("NFKC")
@@ -94,7 +96,20 @@ export function collectSpecColumns(items: SpecContainer[], maxColumns = 8): Spec
     });
   });
 
-  return columns.slice(0, maxColumns);
+  const priorityColumns: SpecColumn[] = [];
+  PRIORITY_SPEC_KEY_ORDER.forEach((priorityKey) => {
+    const match = columns.find((column) => column.normalizedKey === priorityKey);
+    if (match) {
+      priorityColumns.push(match);
+    }
+  });
+
+  const otherColumns = columns.filter(
+    (column) => !PRIORITY_SPEC_KEY_ORDER.includes(column.normalizedKey),
+  );
+
+  const maxOtherColumns = Math.max(0, maxColumns);
+  return [...priorityColumns, ...otherColumns.slice(0, maxOtherColumns)];
 }
 
 export function getSpecValueForColumn(

@@ -9,6 +9,7 @@ import {
   collectSpecColumns,
   formatSpecValue,
   getSpecValueForColumn,
+  normalizeSpecKey,
   type ProductSpecification,
   type SpecColumn,
 } from "@/lib/spec-table";
@@ -1030,15 +1031,20 @@ async function generateCatalogPdf(
 
     const rows = product.variants.length ? product.variants : [product];
     const specColumns: SpecColumn[] = collectSpecColumns(rows);
+    const normalizedSizeKey = normalizeSpecKey("Storlek");
+    const sizeColumn =
+      specColumns.find((column) => column.normalizedKey === normalizedSizeKey) ??
+      ({ key: "Storlek", normalizedKey: normalizedSizeKey, label: "Storlek" } satisfies SpecColumn);
+    const otherColumns = specColumns.filter((column) => column.normalizedKey !== normalizedSizeKey);
     const tableHead = [
       "Artikelnummer",
-      "Benämning",
-      ...specColumns.map((column) => normalizePdfText(column.label)),
+      "Storlek",
+      ...otherColumns.map((column) => normalizePdfText(column.label)),
     ];
     const tableBody = rows.map((row) => [
       normalizePdfText(row.articleNumber),
-      normalizePdfText(row.title),
-      ...specColumns.map((column) =>
+      normalizePdfText(formatSpecValue(getSpecValueForColumn(row, sizeColumn))),
+      ...otherColumns.map((column) =>
         normalizePdfText(formatSpecValue(getSpecValueForColumn(row, column))),
       ),
     ]);

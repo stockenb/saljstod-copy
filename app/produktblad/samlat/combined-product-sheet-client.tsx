@@ -7,11 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
-import {
-  analyzeProductTitles,
-  extractSizeTokens,
-  tokenizeTitle,
-} from "@/lib/product-title";
+import { analyzeProductTitles } from "@/lib/product-title";
 
 type Specification = {
   key: string;
@@ -66,63 +62,11 @@ const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
 const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
 
-function deriveSizeValueFromTitle(
-  title: string | null | undefined,
-  prefixTokens: string[],
-  suffixTokens: string[],
-) {
-  const appendMillimeterSuffix = (sizeTokens: string[], suffix: string[]) => {
-    if (sizeTokens.length === 0) {
-      return sizeTokens;
-    }
-
-    const hasMeasurements = sizeTokens.some((token) => /\d/.test(token));
-    const hasMillimeter = sizeTokens.some(
-      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
-    );
-    const suffixMillimeter = suffix.find(
-      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
-    );
-
-    if (!hasMeasurements || hasMillimeter || !suffixMillimeter) {
-      return sizeTokens;
-    }
-
-    return [...sizeTokens, suffixMillimeter];
-  };
-
-  const trimmedTitle = (title ?? "").trim();
-
-  if (!trimmedTitle) {
-    return "";
-  }
-
-  const tokens = tokenizeTitle(trimmedTitle);
-  const primarySizeTokens = appendMillimeterSuffix(
-    extractSizeTokens(tokens, prefixTokens, suffixTokens),
-    suffixTokens,
-  );
-
-  if (primarySizeTokens.length > 0 && primarySizeTokens.length < tokens.length) {
-    return primarySizeTokens.join(" ").trim();
-  }
-
-  const fallbackAnalysis = analyzeProductTitles([{ title: trimmedTitle }]);
-  const fallbackSizeTokens = appendMillimeterSuffix(
-    extractSizeTokens(
-      tokens,
-      fallbackAnalysis.prefixTokens,
-      fallbackAnalysis.suffixTokens,
-    ),
-    fallbackAnalysis.suffixTokens,
-  );
-
-  return fallbackSizeTokens.join(" ").trim();
-}
-
 function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
+
+const NORMALIZED_SIZE_KEY = normalizeSpecKey("Storlek");
 
 function normalizeSwedishDecimal(value: string): number | null {
   if (!value) {
@@ -177,6 +121,10 @@ function getSpecValue(
   }
 
   return null;
+}
+
+function getSizeSpecValue(specMap: Map<string, string>) {
+  return getSpecValue(specMap, (label) => label === NORMALIZED_SIZE_KEY);
 }
 
 function getPackagingValue(specMap: Map<string, string>) {
@@ -735,7 +683,7 @@ export default function CombinedProductSheetClientPage() {
       const firstProduct = products[0];
       const descriptionForPdf = sharedDescription || "";
       const sharedImage = firstProduct?.image ?? "";
-      const { combinedTitle, prefixTokens, suffixTokens } = analyzeProductTitles(products);
+      const { combinedTitle } = analyzeProductTitles(products);
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -959,8 +907,6 @@ export default function CombinedProductSheetClientPage() {
       const specOrder: string[] = [];
       const rawEntries = products.map((product) => {
         const articleNumber = displayValue(product.articleNumber);
-        const originalTitle = (product.title ?? "").trim();
-        const tokens = tokenizeTitle(originalTitle);
         const specMap = new Map<string, string>();
 
         product.specs.forEach((spec) => {
@@ -976,31 +922,29 @@ export default function CombinedProductSheetClientPage() {
           specMap.set(label, trimmedValue);
         });
 
-        return { articleNumber, originalTitle, tokens, specMap };
+        return { articleNumber, specMap };
       });
 
-      const prefixLength = prefixTokens.length;
-      const suffixLength = suffixTokens.length;
-
       const articleEntries = rawEntries.map((entry) => {
-        const sizeText = deriveSizeValueFromTitle(
-          entry.originalTitle,
-          prefixTokens,
-          suffixTokens,
-        );
+        const sizeValue = getSizeSpecValue(entry.specMap) ?? "";
         const packaging = getPackagingValue(entry.specMap);
 
         return {
           articleNumber: entry.articleNumber,
-          size: displayValue(sizeText || entry.originalTitle),
+          sizeValue,
           specMap: entry.specMap,
           packaging,
         };
       });
 
-      const visibleSpecOrder = specOrder.filter((label) => !hiddenSpecSet.has(label));
+      const isSizeLabel = (label: string) => normalizeSpecKey(label) === NORMALIZED_SIZE_KEY;
+      const sizeSpecLabel = specOrder.find(isSizeLabel) ?? null;
+      const showSizeColumn = Boolean(sizeSpecLabel && !hiddenSpecSet.has(sizeSpecLabel));
 
-      const sharedSpecLabels = visibleSpecOrder.filter((label) => {
+      const visibleSpecOrder = specOrder.filter((label) => !hiddenSpecSet.has(label));
+      const visibleNonSizeSpecOrder = visibleSpecOrder.filter((label) => !isSizeLabel(label));
+
+      const sharedSpecLabels = visibleNonSizeSpecOrder.filter((label) => {
         const firstValue = (rawEntries[0]?.specMap.get(label) ?? "").trim();
         if (!firstValue) {
           return false;
@@ -1017,7 +961,7 @@ export default function CombinedProductSheetClientPage() {
         value: displayValue(rawEntries[0]?.specMap.get(label)),
       }));
 
-      const remainingSpecLabels = visibleSpecOrder.filter(
+      const remainingSpecLabels = visibleNonSizeSpecOrder.filter(
         (label) => !sharedSpecLabels.includes(label),
       );
       const filteredSpecLabels = remainingSpecLabels.filter((label) =>
@@ -1087,12 +1031,12 @@ export default function CombinedProductSheetClientPage() {
 
         const headRow = sanitizePdfTextArray([
           "Artikelnummer",
-          "Storlek",
+          ...(showSizeColumn ? ["Storlek"] : []),
           ...filteredSpecLabels.map((label) => sanitizePdfText(label)),
         ]);
         const tableBody = articleEntries
           .map((entry) => {
-            const sizeMetrics = parseSizeMetrics(entry.size);
+            const sizeMetrics = parseSizeMetrics(entry.sizeValue);
             const normalizedPackaging = normalizePackagingLabel(
               entry.packaging ?? null,
             );
@@ -1164,11 +1108,13 @@ export default function CombinedProductSheetClientPage() {
             const rowValues = filteredSpecLabels.map((label) =>
               displayValue(entry.specMap.get(label)),
             );
-            return [
-              displayValue(entry.articleNumber),
-              entry.size,
-              ...rowValues,
-            ];
+            const sizeCellValue = entry.sizeValue?.trim() ?? "";
+            const row: string[] = [displayValue(entry.articleNumber)];
+            if (showSizeColumn) {
+              row.push(sizeCellValue);
+            }
+            row.push(...rowValues);
+            return row;
           });
 
         autoTable(doc, {
