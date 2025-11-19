@@ -14,6 +14,17 @@ test("getCategoryTree parses categories", async () => {
   assert.ok(categories[0]?.id, "categories should include an id");
 });
 
+test("getCategoryTree exposes nested categories", async () => {
+  const categories = await getCategoryTree();
+  const nested = categories.find((category) => category.children.length > 0);
+
+  assert.ok(nested, "at least one top-level category should contain children");
+  assert.ok(
+    Array.isArray(nested!.children[0]?.children),
+    "child nodes should include their own children arrays",
+  );
+});
+
 test("getProductsForCategory returns parents with variants", async () => {
   const categories = await getCategoryTree();
   const findWithChildren = (nodes: typeof categories): (typeof categories)[number] | undefined => {

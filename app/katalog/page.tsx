@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
+import { PACKAGING_FILTER_VALUES, type PackagingFilterValue } from "@/lib/artikelbas-filters";
 import {
   collectSpecColumns,
   formatSpecValue,
@@ -10,6 +12,7 @@ import {
   type ProductSpecification,
   type SpecColumn,
 } from "@/lib/spec-table";
+import { normalizePdfText } from "@/lib/pdf-text";
 import { cn } from "@/lib/utils";
 
 type Product = {
@@ -74,6 +77,13 @@ const appendixSections: AppendixSection[] = [
   },
 ];
 
+const PACKAGING_LABELS: Record<PackagingFilterValue, string> = {
+  bucket: "Hink",
+  package: "Paket",
+  "small-pack": "Småpack",
+  bulk: "Bulk",
+};
+
 const POPPINS_FONT_URLS = {
   regular: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.ttf",
   semiBold: "https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-600-normal.ttf",
@@ -89,6 +99,7 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
 type SelectionState = Record<string, boolean>;
+type PackagingSelectionState = Record<PackagingFilterValue, boolean>;
 
 type PdfState =
   | { status: "idle" }
@@ -169,12 +180,48 @@ function createAppendixSelection(sections: AppendixSection[]): SelectionState {
   }, {});
 }
 
+function createExpandedState(categories: ProductCategory[]): SelectionState {
+  const expanded: SelectionState = {};
+
+  const visit = (category: ProductCategory, depth: number) => {
+    expanded[category.id] = depth === 0;
+    category.children.forEach((child) => visit(child, depth + 1));
+  };
+
+  categories.forEach((category) => visit(category, 0));
+  return expanded;
+}
+
+function createPackagingSelection(defaultValue = false): PackagingSelectionState {
+  return PACKAGING_FILTER_VALUES.reduce<PackagingSelectionState>((acc, value) => {
+    acc[value] = defaultValue;
+    return acc;
+  }, {} as PackagingSelectionState);
+}
+
+function parseSkuInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,;]+/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    ),
+  );
+}
+
 export default function CatalogGeneratorPage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [categorySelection, setCategorySelection] = useState<SelectionState>({});
+  const [expandedCategories, setExpandedCategories] = useState<SelectionState>({});
   const [appendixSelection, setAppendixSelection] = useState<SelectionState>(() =>
     createAppendixSelection(appendixSections),
   );
+  const [packagingSelection, setPackagingSelection] = useState<PackagingSelectionState>(() =>
+    createPackagingSelection(false),
+  );
+  const [includeSkuInput, setIncludeSkuInput] = useState("");
+  const [excludeSkuInput, setExcludeSkuInput] = useState("");
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [pdfState, setPdfState] = useState<PdfState>({ status: "idle" });
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -195,6 +242,7 @@ export default function CatalogGeneratorPage() {
         const nextCategories = data.categories ?? [];
         setCategories(nextCategories);
         setCategorySelection(createSelectionFromCategories(nextCategories));
+        setExpandedCategories(createExpandedState(nextCategories));
         setCategoryError(null);
       })
       .catch((error) => {
@@ -256,6 +304,13 @@ export default function CatalogGeneratorPage() {
     });
   };
 
+  const handleToggleExpand = (categoryId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !(prev[categoryId] ?? false),
+    }));
+  };
+
   function toggleCategory(category: ProductCategory, checked: boolean) {
     setCategorySelection((prev) => {
       const next = { ...prev } as SelectionState;
@@ -266,6 +321,13 @@ export default function CatalogGeneratorPage() {
       apply(category);
       return next;
     });
+  }
+
+  function togglePackaging(filter: PackagingFilterValue, checked: boolean) {
+    setPackagingSelection((prev) => ({
+      ...prev,
+      [filter]: checked,
+    }));
   }
 
   function toggleAppendix(id: string, checked: boolean) {
@@ -287,6 +349,12 @@ export default function CatalogGeneratorPage() {
 
     setPdfState({ status: "loading", message: "Hämtar artiklar och genererar PDF..." });
 
+    const selectedPackagingFilters = PACKAGING_FILTER_VALUES.filter(
+      (value) => packagingSelection[value],
+    );
+    const includeSkus = parseSkuInput(includeSkuInput);
+    const excludeSkus = parseSkuInput(excludeSkuInput);
+
     try {
       const response = await fetch("/api/catalog-products", {
         method: "POST",
@@ -294,6 +362,9 @@ export default function CatalogGeneratorPage() {
         body: JSON.stringify({
           categoryIds: selectedCategories,
           includeDescendants: true,
+          packagingFilters: selectedPackagingFilters,
+          includeSkus,
+          excludeSkus,
         }),
       });
 
@@ -334,7 +405,8 @@ export default function CatalogGeneratorPage() {
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
+        <div className="space-y-6">
+          <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <header className="max-w-xl space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">Välj kategorier</h2>
@@ -374,11 +446,78 @@ export default function CatalogGeneratorPage() {
               <CategoryTree
                 categories={categories}
                 selection={categorySelection}
+                expanded={expandedCategories}
                 onToggleCategory={toggleCategory}
+                onToggleExpand={handleToggleExpand}
               />
             </div>
           )}
         </section>
+
+          <section className="space-y-6 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
+            <header className="space-y-1">
+              <h2 className="text-lg font-semibold text-slate-900">Filtrera artiklar</h2>
+              <p className="text-sm text-neutral-600">
+                Välj förpackningstyper och specificera artikelnummer som ska läggas till eller tas bort.
+              </p>
+            </header>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-slate-900">Förpackningstyper</p>
+              <p className="text-xs text-neutral-500">
+                Lämna tomt för att inkludera alla förpackningstyper.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {PACKAGING_FILTER_VALUES.map((filter) => (
+                  <label
+                    key={filter}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-medium shadow-sm transition",
+                      packagingSelection[filter]
+                        ? "border-sky-300 bg-sky-50 text-sky-900"
+                        : "border-transparent text-slate-700 hover:border-sky-200 hover:bg-sky-50",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                      checked={packagingSelection[filter] ?? false}
+                      onChange={(event) => togglePackaging(filter, event.target.checked)}
+                    />
+                    {PACKAGING_LABELS[filter]}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-900">Inkludera artikelnummer</span>
+                <textarea
+                  value={includeSkuInput}
+                  onChange={(event) => setIncludeSkuInput(event.target.value)}
+                  className="min-h-[110px] w-full rounded-xl border border-neutral-200 bg-white/80 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Ex: 12345, 67890"
+                />
+                <span className="text-xs text-neutral-500">
+                  Separera med kommatecken, mellanslag eller radbrytningar.
+                </span>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-900">Exkludera artikelnummer</span>
+                <textarea
+                  value={excludeSkuInput}
+                  onChange={(event) => setExcludeSkuInput(event.target.value)}
+                  className="min-h-[110px] w-full rounded-xl border border-neutral-200 bg-white/80 p-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Ex: 560733"
+                />
+                <span className="text-xs text-neutral-500">
+                  Dessa artikelnummer tas alltid bort från katalogen.
+                </span>
+              </label>
+            </div>
+          </section>
+        </div>
 
         <aside className="space-y-6">
           <section className="space-y-4 rounded-2xl border border-white/60 bg-white/80 p-6 shadow-sm">
@@ -465,18 +604,35 @@ export default function CatalogGeneratorPage() {
 interface CategoryTreeProps {
   categories: ProductCategory[];
   selection: SelectionState;
+  expanded: SelectionState;
   onToggleCategory: (category: ProductCategory, checked: boolean) => void;
+  onToggleExpand: (id: string) => void;
+  depth?: number;
 }
 
-function CategoryTree({ categories, selection, onToggleCategory }: CategoryTreeProps) {
+function CategoryTree({
+  categories,
+  selection,
+  expanded,
+  onToggleCategory,
+  onToggleExpand,
+  depth = 0,
+}: CategoryTreeProps) {
   return (
-    <ul className="space-y-3">
+    <ul
+      className={cn(
+        "space-y-3",
+        depth > 0 && "border-l border-dashed border-neutral-200 pl-4",
+      )}
+    >
       {categories.map((category) => (
         <CategoryTreeNode
           key={category.id}
           category={category}
           selection={selection}
+          expanded={expanded}
           onToggleCategory={onToggleCategory}
+          onToggleExpand={onToggleExpand}
         />
       ))}
     </ul>
@@ -486,42 +642,74 @@ function CategoryTree({ categories, selection, onToggleCategory }: CategoryTreeP
 interface CategoryTreeNodeProps {
   category: ProductCategory;
   selection: SelectionState;
+  expanded: SelectionState;
   onToggleCategory: (category: ProductCategory, checked: boolean) => void;
+  onToggleExpand: (id: string) => void;
 }
 
-function CategoryTreeNode({ category, selection, onToggleCategory }: CategoryTreeNodeProps) {
+function CategoryTreeNode({
+  category,
+  selection,
+  expanded,
+  onToggleCategory,
+  onToggleExpand,
+}: CategoryTreeNodeProps) {
   const descendantIds = useMemo(() => collectCategoryIds([category]), [category]);
   const checkedCount = descendantIds.filter((id) => selection[id]).length;
-  const allSelected = checkedCount === descendantIds.length && descendantIds.length > 0;
   const partiallySelected = checkedCount > 0 && checkedCount < descendantIds.length;
   const checkboxRef = useIndeterminateCheckbox(partiallySelected);
+  const isExpanded = expanded[category.id] ?? false;
+  const showChildren = isExpanded && category.children.length > 0;
 
   return (
     <li className="rounded-2xl border border-neutral-200/70 bg-white/80 p-4 shadow-sm">
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          ref={checkboxRef}
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-          checked={allSelected}
-          onChange={(event) => onToggleCategory(category, event.target.checked)}
-        />
-        <span className="space-y-1">
-          <span className="block text-base font-semibold text-slate-900">{category.name}</span>
-          {category.productSkus.length ? (
-            <span className="block text-xs text-neutral-500">
-              {category.productSkus.length} moderartiklar i denna nivå
-            </span>
-          ) : null}
-        </span>
-      </label>
+      <div className="flex items-start gap-2">
+        {category.children.length ? (
+          <button
+            type="button"
+            className="mt-1 rounded-full p-1 text-slate-500 transition hover:bg-slate-100"
+            onClick={() => onToggleExpand(category.id)}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? "Fäll ihop underkategorier" : "Visa underkategorier"}
+          >
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 transition-transform",
+                isExpanded && "rotate-90",
+              )}
+            />
+          </button>
+        ) : (
+          <span className="mt-2 h-4 w-4" aria-hidden="true" />
+        )}
+        <label className="flex flex-1 cursor-pointer items-start gap-3">
+          <input
+            ref={checkboxRef}
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-neutral-300 text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            checked={selection[category.id] ?? false}
+            onChange={(event) => onToggleCategory(category, event.target.checked)}
+          />
+          <span className="space-y-1">
+            <span className="block text-base font-semibold text-slate-900">{category.name}</span>
+            {category.productSkus.length ? (
+              <span className="block text-xs text-neutral-500">
+                {category.productSkus.length} moderartiklar i denna nivå
+              </span>
+            ) : null}
+          </span>
+        </label>
+      </div>
 
-      {category.children.length ? (
-        <div className="mt-3 border-l border-dashed border-neutral-200 pl-4">
+      {showChildren ? (
+        <div className="mt-3">
           <CategoryTree
             categories={category.children}
             selection={selection}
+            expanded={expanded}
             onToggleCategory={onToggleCategory}
+            onToggleExpand={onToggleExpand}
+            depth={depth + 1}
           />
         </div>
       ) : null}
@@ -774,30 +962,36 @@ async function generateCatalogPdf(
     doc.setFont(baseFont, boldStyle);
     doc.setFontSize(14);
     doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-    doc.text(product.title, pageMarginX, cursorY);
+    doc.text(normalizePdfText(product.title), pageMarginX, cursorY);
     cursorY += 6;
 
-    const descriptionWidth = contentWidth * 0.6;
-    const imageMaxWidth = contentWidth * 0.35;
-    let imageHeight = 0;
-    let imageWidth = 0;
+    const blockStartY = cursorY;
+    const imageMaxWidth = contentWidth * 0.38;
+    const imageMaxHeight = 60;
+    const columnGap = 8;
+    let imageDimensions: { width: number; height: number } | null = null;
 
     if (product.image) {
       try {
         const image = await loadImageAsset(product.image);
-        imageWidth = Math.min(imageMaxWidth, image.width / 4);
-        imageHeight = (image.height / image.width) * imageWidth;
-        if (imageHeight > 70) {
-          imageHeight = 70;
+        let imageWidth = Math.min(imageMaxWidth, image.width / 4);
+        if (!Number.isFinite(imageWidth) || imageWidth <= 0) {
+          imageWidth = imageMaxWidth;
+        }
+        let imageHeight = (image.height / image.width) * imageWidth;
+        if (!Number.isFinite(imageHeight) || imageHeight <= 0) {
+          imageHeight = imageMaxHeight;
+        }
+        if (imageHeight > imageMaxHeight) {
+          imageHeight = imageMaxHeight;
           imageWidth = (image.width / image.height) * imageHeight;
         }
-        const imageX = pageMarginX + contentWidth - imageWidth;
-        const imageY = cursorY;
+        imageDimensions = { width: imageWidth, height: imageHeight };
         doc.addImage(
           image.dataUrl,
           image.format,
-          imageX,
-          imageY,
+          pageMarginX,
+          blockStartY,
           imageWidth,
           imageHeight,
           undefined,
@@ -808,27 +1002,42 @@ async function generateCatalogPdf(
       }
     }
 
-    if (product.description) {
+    const hasImage = Boolean(imageDimensions);
+    const textX = hasImage ? pageMarginX + (imageDimensions?.width ?? 0) + columnGap : pageMarginX;
+    const minTextWidth = hasImage ? contentWidth * 0.45 : contentWidth;
+    const computedWidth = contentWidth - (hasImage ? (imageDimensions?.width ?? 0) + columnGap : 0);
+    const descriptionWidth = Math.max(minTextWidth, computedWidth > 0 ? computedWidth : minTextWidth);
+    let textBottom = blockStartY;
+    const sanitizedDescription = normalizePdfText(product.description);
+
+    if (sanitizedDescription) {
       doc.setFont(baseFont, normalStyle);
       doc.setFontSize(9.5);
       doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-      const descriptionLines = doc.splitTextToSize(product.description, descriptionWidth);
-      doc.text(descriptionLines, pageMarginX, cursorY);
-      cursorY += descriptionLines.length * 4.4 + 4;
+      const descriptionLines = doc.splitTextToSize(sanitizedDescription, descriptionWidth);
+      if (descriptionLines.length) {
+        doc.text(descriptionLines, textX, blockStartY);
+        textBottom = blockStartY + descriptionLines.length * 4.4;
+      }
     }
 
-    if (imageHeight) {
-      const imageBottom = cursorY < pageMarginTop + imageHeight ? pageMarginTop + imageHeight : cursorY;
-      cursorY = Math.max(cursorY, imageBottom + 4);
-    }
+    const imageBottom = hasImage ? blockStartY + (imageDimensions?.height ?? 0) : blockStartY;
+    const blockBottom = Math.max(textBottom, imageBottom);
+    cursorY = (blockBottom === blockStartY ? blockStartY + 4 : blockBottom) + 6;
 
     const rows = product.variants.length ? product.variants : [product];
     const specColumns: SpecColumn[] = collectSpecColumns(rows);
-    const tableHead = ["Artikelnummer", "Benämning", ...specColumns.map((column) => column.label)];
+    const tableHead = [
+      "Artikelnummer",
+      "Benämning",
+      ...specColumns.map((column) => normalizePdfText(column.label)),
+    ];
     const tableBody = rows.map((row) => [
-      row.articleNumber,
-      row.title,
-      ...specColumns.map((column) => formatSpecValue(getSpecValueForColumn(row, column))),
+      normalizePdfText(row.articleNumber),
+      normalizePdfText(row.title),
+      ...specColumns.map((column) =>
+        normalizePdfText(formatSpecValue(getSpecValueForColumn(row, column))),
+      ),
     ]);
 
     if (tableBody.length > 0) {
@@ -875,7 +1084,7 @@ async function generateCatalogPdf(
     doc.setFont(baseFont, normalStyle);
     doc.setFontSize(8.5);
     doc.setTextColor(slateText[0], slateText[1], slateText[2]);
-    doc.text(product.link, pageMarginX, cursorY);
+    doc.text(normalizePdfText(product.link), pageMarginX, cursorY);
     cursorY += 10;
   }
 
@@ -894,10 +1103,13 @@ async function generateCatalogPdf(
 
     let cursorY = pageMarginTop + 8;
     otherAppendices.forEach((appendix) => {
-      doc.text(`• ${appendix.title}`, pageMarginX, cursorY);
+      doc.text(`• ${normalizePdfText(appendix.title)}`, pageMarginX, cursorY);
       cursorY += 5;
       if (appendix.description) {
-        const lines = doc.splitTextToSize(appendix.description, contentWidth - 8);
+        const lines = doc.splitTextToSize(
+          normalizePdfText(appendix.description),
+          contentWidth - 8,
+        );
         doc.text(lines, pageMarginX + 4, cursorY);
         cursorY += lines.length * 5 + 3;
       }
@@ -932,7 +1144,10 @@ async function generateCatalogPdf(
 
     doc.setFont(baseFont, normalStyle);
     doc.setFontSize(11);
-    const introLines = doc.splitTextToSize(koncernIntro, contentWidth * 0.55);
+    const introLines = doc.splitTextToSize(
+      normalizePdfText(koncernIntro),
+      contentWidth * 0.55,
+    );
     doc.text(introLines, pageMarginX, 84);
 
     const imageMaxWidth = contentWidth * 0.4;
@@ -970,17 +1185,20 @@ async function generateCatalogPdf(
 
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(12);
-      doc.text(company.name, pageMarginX, companyY);
+      doc.text(normalizePdfText(company.name), pageMarginX, companyY);
       companyY += 6;
 
       doc.setFont(baseFont, normalStyle);
       doc.setFontSize(11);
-      const descriptionLines = doc.splitTextToSize(company.description, contentWidth);
+      const descriptionLines = doc.splitTextToSize(
+        normalizePdfText(company.description),
+        contentWidth,
+      );
       doc.text(descriptionLines, pageMarginX, companyY);
       companyY += descriptionLines.length * 5.5;
 
       doc.setTextColor(2, 53, 98);
-      doc.text(company.website, pageMarginX, companyY);
+      doc.text(normalizePdfText(company.website), pageMarginX, companyY);
       doc.setTextColor(15, 23, 42);
       companyY += 7;
     });

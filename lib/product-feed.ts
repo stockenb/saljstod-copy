@@ -414,6 +414,29 @@ export async function getProductsByArticleNumbers(
   return products.filter((product) => targets.has(product.articleNumber));
 }
 
+export async function getProductWithVariantsBySku(
+  articleNumber: string,
+): Promise<ProductWithVariants | null> {
+  const trimmed = articleNumber.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const { productIndex, variantsByParentSku, parentBySku } = await loadFeedData();
+  const parentSku = parentBySku.get(trimmed);
+  const resolvedParentSku = parentSku ?? trimmed;
+  const parentProduct = productIndex.get(resolvedParentSku);
+
+  if (!parentProduct) {
+    return null;
+  }
+
+  return {
+    ...parentProduct,
+    variants: variantsByParentSku.get(resolvedParentSku) ?? [],
+  } satisfies ProductWithVariants;
+}
+
 export async function getCategoryTree(): Promise<ProductCategory[]> {
   const { categories } = await loadFeedData();
   return categories;
