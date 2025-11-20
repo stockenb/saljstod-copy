@@ -99,6 +99,16 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
+const CATALOG_HIDDEN_SPEC_KEYS = [
+  "Förpackningsstorlek",
+  "BASTA",
+  "CE-märkt enligt standard",
+  "DOP",
+  "BK04 benämning",
+];
+
+const CATALOG_SPEC_FILTER_OPTIONS = { hiddenKeys: CATALOG_HIDDEN_SPEC_KEYS } as const;
+
 type SelectionState = Record<string, boolean>;
 type PackagingSelectionState = Record<PackagingFilterValue, boolean>;
 
@@ -1030,7 +1040,7 @@ async function generateCatalogPdf(
     cursorY = (blockBottom === blockStartY ? blockStartY + 4 : blockBottom) + 6;
 
     const rows = product.variants.length ? product.variants : [product];
-    const specColumns: SpecColumn[] = collectSpecColumns(rows);
+    const specColumns: SpecColumn[] = collectSpecColumns(rows, undefined, CATALOG_SPEC_FILTER_OPTIONS);
     const normalizedSizeKey = normalizeSpecKey("Storlek");
     const sizeColumn =
       specColumns.find((column) => column.normalizedKey === normalizedSizeKey) ??
@@ -1043,9 +1053,13 @@ async function generateCatalogPdf(
     ];
     const tableBody = rows.map((row) => [
       normalizePdfText(row.articleNumber),
-      normalizePdfText(formatSpecValue(getSpecValueForColumn(row, sizeColumn))),
+      normalizePdfText(
+        formatSpecValue(getSpecValueForColumn(row, sizeColumn, CATALOG_SPEC_FILTER_OPTIONS)),
+      ),
       ...otherColumns.map((column) =>
-        normalizePdfText(formatSpecValue(getSpecValueForColumn(row, column))),
+        normalizePdfText(
+          formatSpecValue(getSpecValueForColumn(row, column, CATALOG_SPEC_FILTER_OPTIONS)),
+        ),
       ),
     ]);
 

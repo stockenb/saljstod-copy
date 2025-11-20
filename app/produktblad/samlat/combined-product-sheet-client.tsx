@@ -60,7 +60,12 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
-const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
+const EXCLUDED_SPEC_KEYS = new Set([
+  "ean-kod",
+  "benämning engelska",
+  "vikt",
+  "förpackningsstorlek",
+]);
 
 function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();

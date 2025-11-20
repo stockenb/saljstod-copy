@@ -21,6 +21,7 @@ const baseSpecs: ProductSpecification[] = [
   { key: "Primärförpackning", value: "Styck" },
   { key: "SB förpackning", value: "Styck" },
   { key: "Färg", value: "Röd" },
+  { key: "Förpackningsstorlek", value: "12" },
 ];
 
 test("spec filtering hides unwanted keys", () => {
@@ -33,6 +34,7 @@ test("spec filtering hides unwanted keys", () => {
   assert.ok(!allowedKeys.includes("coating"));
   assert.ok(!allowedKeys.includes("ytbehandling"));
   assert.ok(!allowedKeys.includes("benämning"));
+  assert.ok(!allowedKeys.includes("förpackningsstorlek"));
 });
 
 test("collectSpecColumns excludes Benämning column", () => {
@@ -88,4 +90,19 @@ test("Storlek column is prioritized and uses spec value", () => {
 
   const value = getSpecValueForColumn({ specs }, storlekColumn);
   assert.equal(value, "5,5x60 mm");
+});
+
+test("catalog specific spec keys can be hidden", () => {
+  const specs: ProductSpecification[] = [
+    { key: "BASTA", value: "Ja" },
+    { key: "CE-märkt enligt standard", value: "SS-EN" },
+    { key: "BK04 benämning", value: "1234" },
+    { key: "DOP", value: "5678" },
+  ];
+
+  const columns = collectSpecColumns([{ specs }], undefined, {
+    hiddenKeys: ["BASTA", "CE-märkt enligt standard", "BK04 benämning", "DOP"],
+  });
+
+  assert.equal(columns.length, 0);
 });
