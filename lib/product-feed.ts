@@ -437,6 +437,23 @@ export async function getProductWithVariantsBySku(
   } satisfies ProductWithVariants;
 }
 
+export async function getFamilyMaps(): Promise<{
+  parentBySku: Map<string, string | null>;
+  variantsByParentSku: Map<string, Product[]>;
+}> {
+  const { parentBySku, variantsByParentSku } = await loadFeedData();
+
+  const clonedParentMap = new Map(parentBySku);
+  const clonedVariantMap = new Map(
+    Array.from(variantsByParentSku.entries()).map(([parentSku, variants]) => [
+      parentSku,
+      [...variants],
+    ]),
+  );
+
+  return { parentBySku: clonedParentMap, variantsByParentSku: clonedVariantMap };
+}
+
 export async function getCategoryTree(): Promise<ProductCategory[]> {
   const { categories } = await loadFeedData();
   return categories;

@@ -37,6 +37,13 @@ const primaryCards: Card[] = [
 
 const secondaryCards: Card[] = [
   {
+    href: "/dashboard",
+    title: "Dashboard",
+    description: "Visualisera produktflöde och datakvalitet.",
+    emoji: "📊",
+    variant: "compact" as const,
+  },
+  {
     href: "/produktblad",
     title: "Skapa produktblad",
     description: "Generera redigerbara produktblad som PDF.",
@@ -64,7 +71,7 @@ const secondaryCards: Card[] = [
     emoji: "🏷️",
     variant: "compact" as const,
   },
-    {
+  {
     href: "",
     title: "Generera katalog",
     description: "Generera katalog utifrån valda kategorier.",
