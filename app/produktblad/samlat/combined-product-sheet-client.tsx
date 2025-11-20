@@ -6,12 +6,9 @@ import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { buildSortableArticle, compareSortableArticles } from "@/lib/article-sorting";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
-import {
-  analyzeProductTitles,
-  extractSizeTokens,
-  tokenizeTitle,
-} from "@/lib/product-title";
+import { analyzeProductTitles } from "@/lib/product-title";
 
 type Specification = {
   key: string;
@@ -64,107 +61,18 @@ type PoppinsFontVariant = keyof typeof POPPINS_FONT_URLS;
 
 const poppinsFontCache: Partial<Record<PoppinsFontVariant, string>> = {};
 
-const EXCLUDED_SPEC_KEYS = new Set(["ean-kod", "benämning engelska", "vikt"]);
-
-function deriveSizeValueFromTitle(
-  title: string | null | undefined,
-  prefixTokens: string[],
-  suffixTokens: string[],
-) {
-  const appendMillimeterSuffix = (sizeTokens: string[], suffix: string[]) => {
-    if (sizeTokens.length === 0) {
-      return sizeTokens;
-    }
-
-    const hasMeasurements = sizeTokens.some((token) => /\d/.test(token));
-    const hasMillimeter = sizeTokens.some(
-      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
-    );
-    const suffixMillimeter = suffix.find(
-      (token) => token.trim().toLocaleLowerCase("sv-SE") === "mm",
-    );
-
-    if (!hasMeasurements || hasMillimeter || !suffixMillimeter) {
-      return sizeTokens;
-    }
-
-    return [...sizeTokens, suffixMillimeter];
-  };
-
-  const trimmedTitle = (title ?? "").trim();
-
-  if (!trimmedTitle) {
-    return "";
-  }
-
-  const tokens = tokenizeTitle(trimmedTitle);
-  const primarySizeTokens = appendMillimeterSuffix(
-    extractSizeTokens(tokens, prefixTokens, suffixTokens),
-    suffixTokens,
-  );
-
-  if (primarySizeTokens.length > 0 && primarySizeTokens.length < tokens.length) {
-    return primarySizeTokens.join(" ").trim();
-  }
-
-  const fallbackAnalysis = analyzeProductTitles([{ title: trimmedTitle }]);
-  const fallbackSizeTokens = appendMillimeterSuffix(
-    extractSizeTokens(
-      tokens,
-      fallbackAnalysis.prefixTokens,
-      fallbackAnalysis.suffixTokens,
-    ),
-    fallbackAnalysis.suffixTokens,
-  );
-
-  return fallbackSizeTokens.join(" ").trim();
-}
+const EXCLUDED_SPEC_KEYS = new Set([
+  "ean-kod",
+  "benämning engelska",
+  "vikt",
+  "förpackningsstorlek",
+]);
 
 function normalizeSpecKey(label: string) {
   return label.trim().toLowerCase();
 }
 
-function normalizeSwedishDecimal(value: string): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/g, "").replace(/,/g, ".");
-  const parsed = Number.parseFloat(normalized);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function findFirstNumericValue(text: string | null | undefined): number | null {
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(/\d+(?:[.,]\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  return normalizeSwedishDecimal(match[0]) ?? null;
-}
-
-function parseSizeMetrics(sizeText: string) {
-  const normalizedSize = sizeText.replace(/,/g, ".");
-  const match = normalizedSize.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
-
-  if (!match) {
-    const fallback = findFirstNumericValue(sizeText);
-    return {
-      thickness: fallback,
-      length: null as number | null,
-    };
-  }
-
-  const [, thicknessRaw, lengthRaw] = match;
-  const thickness = normalizeSwedishDecimal(thicknessRaw);
-  const length = normalizeSwedishDecimal(lengthRaw);
-
-  return { thickness, length };
-}
+const NORMALIZED_SIZE_KEY = normalizeSpecKey("Storlek");
 
 function getSpecValue(
   specMap: Map<string, string>,
@@ -177,6 +85,10 @@ function getSpecValue(
   }
 
   return null;
+}
+
+function getSizeSpecValue(specMap: Map<string, string>) {
+  return getSpecValue(specMap, (label) => label === NORMALIZED_SIZE_KEY);
 }
 
 function getPackagingValue(specMap: Map<string, string>) {
@@ -201,101 +113,6 @@ function isPrimaryPackagingQuantityLabel(normalizedLabel: string) {
   }
 
   return normalizedLabel.includes("antal");
-}
-
-const PACKAGING_RANK = {
-  sb: 0,
-  paket: 1,
-  hink: 2,
-  bulk: 3,
-  other: 4,
-} as const;
-
-type PackagingRank = (typeof PACKAGING_RANK)[keyof typeof PACKAGING_RANK];
-
-function normalizePackagingLabel(packaging: string | null | undefined) {
-  return (packaging ?? "")
-    .normalize("NFKC")
-    .toLocaleLowerCase("sv-SE")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isBulkPackaging(articleNumber: string, normalizedPackaging: string) {
-  const normalizedArticleNumber = articleNumber.normalize("NFKC").toUpperCase();
-
-  if (normalizedArticleNumber.startsWith("B")) {
-    return true;
-  }
-
-  return (
-    normalizedPackaging.includes("bulk") || normalizedPackaging.includes("kartong")
-  );
-}
-
-function resolvePackagingRank(
-  articleNumber: string,
-  normalizedPackaging: string,
-): PackagingRank {
-  if (isBulkPackaging(articleNumber, normalizedPackaging)) {
-    return PACKAGING_RANK.bulk;
-  }
-
-  if (
-    normalizedPackaging.includes("sb") ||
-    normalizedPackaging.includes("småpack") ||
-    normalizedPackaging.includes("småförpackning")
-  ) {
-    return PACKAGING_RANK.sb;
-  }
-
-  if (normalizedPackaging.includes("paket")) {
-    return PACKAGING_RANK.paket;
-  }
-
-  if (normalizedPackaging.includes("hink")) {
-    return PACKAGING_RANK.hink;
-  }
-
-  return PACKAGING_RANK.other;
-}
-
-const QUANTITY_SPEC_PATTERNS = [
-  "antal",
-  "förpackning",
-  "st/",
-  "st per",
-  "per förp",
-  "per fp",
-  "hink",
-  "sb",
-  "paket",
-  "bulk",
-  "kartong",
-];
-
-function resolvePackagingQuantity(
-  specMap: Map<string, string>,
-  packaging: string | null,
-): number | null {
-  const packagingQuantity = findFirstNumericValue(packaging ?? "");
-  if (packagingQuantity !== null) {
-    return packagingQuantity;
-  }
-
-  for (const [label, value] of specMap.entries()) {
-    const normalizedLabel = normalizeSpecKey(label);
-    if (!QUANTITY_SPEC_PATTERNS.some((pattern) => normalizedLabel.includes(pattern))) {
-      continue;
-    }
-
-    const numericValue = findFirstNumericValue(value);
-    if (numericValue !== null) {
-      return numericValue;
-    }
-  }
-
-  return null;
 }
 
 function normalizeUrl(raw: string): string {
@@ -735,7 +552,7 @@ export default function CombinedProductSheetClientPage() {
       const firstProduct = products[0];
       const descriptionForPdf = sharedDescription || "";
       const sharedImage = firstProduct?.image ?? "";
-      const { combinedTitle, prefixTokens, suffixTokens } = analyzeProductTitles(products);
+      const { combinedTitle } = analyzeProductTitles(products);
 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -959,8 +776,6 @@ export default function CombinedProductSheetClientPage() {
       const specOrder: string[] = [];
       const rawEntries = products.map((product) => {
         const articleNumber = displayValue(product.articleNumber);
-        const originalTitle = (product.title ?? "").trim();
-        const tokens = tokenizeTitle(originalTitle);
         const specMap = new Map<string, string>();
 
         product.specs.forEach((spec) => {
@@ -976,31 +791,29 @@ export default function CombinedProductSheetClientPage() {
           specMap.set(label, trimmedValue);
         });
 
-        return { articleNumber, originalTitle, tokens, specMap };
+        return { articleNumber, specMap };
       });
 
-      const prefixLength = prefixTokens.length;
-      const suffixLength = suffixTokens.length;
-
       const articleEntries = rawEntries.map((entry) => {
-        const sizeText = deriveSizeValueFromTitle(
-          entry.originalTitle,
-          prefixTokens,
-          suffixTokens,
-        );
+        const sizeValue = getSizeSpecValue(entry.specMap) ?? "";
         const packaging = getPackagingValue(entry.specMap);
 
         return {
           articleNumber: entry.articleNumber,
-          size: displayValue(sizeText || entry.originalTitle),
+          sizeValue,
           specMap: entry.specMap,
           packaging,
         };
       });
 
-      const visibleSpecOrder = specOrder.filter((label) => !hiddenSpecSet.has(label));
+      const isSizeLabel = (label: string) => normalizeSpecKey(label) === NORMALIZED_SIZE_KEY;
+      const sizeSpecLabel = specOrder.find(isSizeLabel) ?? null;
+      const showSizeColumn = Boolean(sizeSpecLabel && !hiddenSpecSet.has(sizeSpecLabel));
 
-      const sharedSpecLabels = visibleSpecOrder.filter((label) => {
+      const visibleSpecOrder = specOrder.filter((label) => !hiddenSpecSet.has(label));
+      const visibleNonSizeSpecOrder = visibleSpecOrder.filter((label) => !isSizeLabel(label));
+
+      const sharedSpecLabels = visibleNonSizeSpecOrder.filter((label) => {
         const firstValue = (rawEntries[0]?.specMap.get(label) ?? "").trim();
         if (!firstValue) {
           return false;
@@ -1017,7 +830,7 @@ export default function CombinedProductSheetClientPage() {
         value: displayValue(rawEntries[0]?.specMap.get(label)),
       }));
 
-      const remainingSpecLabels = visibleSpecOrder.filter(
+      const remainingSpecLabels = visibleNonSizeSpecOrder.filter(
         (label) => !sharedSpecLabels.includes(label),
       );
       const filteredSpecLabels = remainingSpecLabels.filter((label) =>
@@ -1087,88 +900,23 @@ export default function CombinedProductSheetClientPage() {
 
         const headRow = sanitizePdfTextArray([
           "Artikelnummer",
-          "Storlek",
+          ...(showSizeColumn ? ["Storlek"] : []),
           ...filteredSpecLabels.map((label) => sanitizePdfText(label)),
         ]);
         const tableBody = articleEntries
-          .map((entry) => {
-            const sizeMetrics = parseSizeMetrics(entry.size);
-            const normalizedPackaging = normalizePackagingLabel(
-              entry.packaging ?? null,
-            );
-            const packagingRank = resolvePackagingRank(
-              entry.articleNumber,
-              normalizedPackaging,
-            );
-            const packagingQuantity = resolvePackagingQuantity(
-              entry.specMap,
-              entry.packaging ?? null,
-            );
-            const isBulk = isBulkPackaging(
-              entry.articleNumber,
-              normalizedPackaging,
-            );
-
-            return {
-              ...entry,
-              sizeMetrics,
-              packagingRank,
-              packagingQuantity,
-              isBulk,
-            };
-          })
-          .sort((a, b) => {
-            const thicknessA =
-              a.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
-            const thicknessB =
-              b.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
-            if (thicknessA !== thicknessB) {
-              return thicknessA - thicknessB;
-            }
-
-            const lengthA = a.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
-            const lengthB = b.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
-            if (lengthA !== lengthB) {
-              return lengthA - lengthB;
-            }
-
-            if (a.isBulk !== b.isBulk) {
-              return a.isBulk ? 1 : -1;
-            }
-
-            if (a.packagingRank !== b.packagingRank) {
-              return a.packagingRank - b.packagingRank;
-            }
-
-            const quantityA = a.packagingQuantity ?? Number.POSITIVE_INFINITY;
-            const quantityB = b.packagingQuantity ?? Number.POSITIVE_INFINITY;
-            if (quantityA !== quantityB) {
-              return quantityA - quantityB;
-            }
-
-            const packagingCompare = (a.packaging ?? "").localeCompare(
-              b.packaging ?? "",
-              "sv-SE",
-              { sensitivity: "accent" },
-            );
-            if (packagingCompare !== 0) {
-              return packagingCompare;
-            }
-
-            return a.articleNumber.localeCompare(b.articleNumber, "sv-SE", {
-              numeric: true,
-              sensitivity: "base",
-            });
-          })
+          .map((entry) => buildSortableArticle(entry, normalizeSpecKey))
+          .sort(compareSortableArticles)
           .map((entry) => {
             const rowValues = filteredSpecLabels.map((label) =>
               displayValue(entry.specMap.get(label)),
             );
-            return [
-              displayValue(entry.articleNumber),
-              entry.size,
-              ...rowValues,
-            ];
+            const sizeCellValue = entry.sizeValue?.trim() ?? "";
+            const row: string[] = [displayValue(entry.articleNumber)];
+            if (showSizeColumn) {
+              row.push(sizeCellValue);
+            }
+            row.push(...rowValues);
+            return row;
           });
 
         autoTable(doc, {
