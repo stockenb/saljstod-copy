@@ -1,4 +1,3 @@
-import { parseSizeMetrics } from "./article-sorting";
 import {
   getAllProducts,
   getCategoryTree,
@@ -31,13 +30,6 @@ export type FamilySpecIssue = {
   missingKeys: string[];
 };
 
-export type DimensionIssue = {
-  sku: string;
-  title: string;
-  size: string;
-  reason: string;
-};
-
 export type DashboardData = {
   stats: DashboardStats;
   dataQualityCounts: DataQualityCounts;
@@ -46,7 +38,6 @@ export type DashboardData = {
   missingDescriptionProducts: Product[];
   familySpecIssues: FamilySpecIssue[];
   inconsistentFamilyCount: number;
-  dimensionIssues: DimensionIssue[];
   categoryLookup: CategoryLookup;
 };
 
@@ -171,39 +162,38 @@ function detectFamilySpecIssues(
 
   variantsByParentSku.forEach((variants, parentSku) => {
     const parent = productIndex.get(parentSku);
-    if (!parent) {
+    if (!parent || variants.length === 0) {
       return;
     }
 
-    const familyProducts = [parent, ...variants];
-    const allKeys = new Set<string>();
     const specMaps = new Map<string, Map<string, string>>();
+    const childKeys = new Set<string>();
 
-    familyProducts.forEach((product) => {
-      const map = createSpecMap(product.specs);
-      specMaps.set(product.articleNumber, map);
-      map.forEach((_value, key) => allKeys.add(key));
+    variants.forEach((variant) => {
+      const map = createSpecMap(variant.specs);
+      specMaps.set(variant.articleNumber, map);
+      map.forEach((_value, key) => childKeys.add(key));
     });
 
     const familyIssues: FamilySpecIssue[] = [];
 
-    allKeys.forEach((key) => {
-      const presentCount = familyProducts.filter((product) => {
-        const value = specMaps.get(product.articleNumber)?.get(key);
+    childKeys.forEach((key) => {
+      const presentCount = variants.filter((variant) => {
+        const value = specMaps.get(variant.articleNumber)?.get(key);
         return value !== undefined && value.trim().length > 0;
       }).length;
 
-      if (presentCount === 0 || presentCount === familyProducts.length) {
+      if (presentCount === 0 || presentCount === variants.length) {
         return;
       }
 
-      familyProducts.forEach((product) => {
-        const value = specMaps.get(product.articleNumber)?.get(key);
+      variants.forEach((variant) => {
+        const value = specMaps.get(variant.articleNumber)?.get(key);
         if (!value || !value.trim()) {
           familyIssues.push({
             familySku: parent.articleNumber,
             familyTitle: parent.title,
-            variantSku: product.articleNumber,
+            variantSku: variant.articleNumber,
             missingKeys: [key],
           });
         }
@@ -217,105 +207,6 @@ function detectFamilySpecIssues(
   });
 
   return { issues, inconsistentFamilies };
-}
-
-function getSizeValue(specs: Product["specs"]): string {
-  const map = createSpecMap(specs);
-  for (const [key, value] of map.entries()) {
-    if (key === "storlek") {
-      return value;
-    }
-  }
-
-  return "";
-}
-
-function detectDimensionIssues(
-  productIndex: Map<string, Product>,
-  variantsByParentSku: Map<string, Product[]>,
-  parentBySku: Map<string, string | null>,
-): DimensionIssue[] {
-  const issues: DimensionIssue[] = [];
-
-  const getFamilyStats = (sku: string) => {
-    const parentSku = parentBySku.get(sku) ?? sku;
-    const variants = variantsByParentSku.get(parentSku) ?? [];
-    const parent = productIndex.get(parentSku);
-    if (!parent) {
-      return [] as Product[];
-    }
-
-    return [parent, ...variants];
-  };
-
-    const evaluateIssue = (product: Product) => {
-    if (parentBySku.get(product.articleNumber) === null) {
-      return;
-    }
-
-    const sizeValue = getSizeValue(product.specs);
-    if (!sizeValue.trim()) {
-      issues.push({
-        sku: product.articleNumber,
-        title: product.title,
-        size: "—",
-        reason: "saknar storlek",
-      });
-      return;
-    }
-
-    const metrics = parseSizeMetrics(sizeValue);
-    const { thickness, length } = metrics;
-
-    const tooSmall =
-      (thickness !== null && thickness <= 0) || (length !== null && length <= 0);
-    const tooLarge =
-      (thickness !== null && thickness > 10000) || (length !== null && length > 100000);
-
-    if (thickness === null && length === null) {
-      issues.push({
-        sku: product.articleNumber,
-        title: product.title,
-        size: sizeValue,
-        reason: "kan inte tolkas",
-      });
-      return;
-    }
-
-    if (tooSmall || tooLarge) {
-      issues.push({
-        sku: product.articleNumber,
-        title: product.title,
-        size: sizeValue,
-        reason: "orimligt mått",
-      });
-      return;
-    }
-
-    const family = getFamilyStats(product.articleNumber);
-    const numericThickness = family
-      .map((entry) => parseSizeMetrics(getSizeValue(entry.specs)).thickness)
-      .filter((value): value is number => value !== null && value > 0 && value < 10000);
-
-    if (numericThickness.length >= 2 && thickness !== null && thickness > 0) {
-      const average =
-        numericThickness.reduce((sum, value) => sum + value, 0) / numericThickness.length;
-      const deviation = Math.abs(thickness - average) / average;
-
-      if (deviation > 0.6) {
-        issues.push({
-          sku: product.articleNumber,
-          title: product.title,
-          size: sizeValue,
-          reason: "avviker från familjens intervall",
-        });
-      }
-    }
-  };
-
-  productIndex.forEach((product) => evaluateIssue(product));
-
-  return issues;
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -341,12 +232,6 @@ export async function getDashboardData(): Promise<DashboardData> {
   const { issues: familySpecIssues, inconsistentFamilies } = detectFamilySpecIssues(
     productIndex,
     variantsByParentSku,
-  );
-
-  const dimensionIssues = detectDimensionIssues(
-    productIndex,
-    variantsByParentSku,
-    parentBySku,
   );
 
   const categoryLookup = collectCategoryPaths(categories);
@@ -377,7 +262,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     missingDescriptionProducts,
     familySpecIssues,
     inconsistentFamilyCount: inconsistentFamilies,
-    dimensionIssues,
     categoryLookup,
   };
 }

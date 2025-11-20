@@ -142,34 +142,6 @@ export default async function DashboardPage() {
             <ArrowUpRight className="h-4 w-4" aria-hidden />
           </Link>
         </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-rose-50 bg-white p-5 shadow-[0_16px_40px_rgba(225,29,72,0.12)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-rose-500">Dimensioner</p>
-              <div className="mt-2 text-3xl font-semibold text-slate-900">
-                {data.dimensionIssues.length.toLocaleString("sv-SE")}
-              </div>
-              <p className="text-sm text-slate-600">Artiklar med avvikande Storlek/mått.</p>
-            </div>
-            <div className="rounded-full bg-rose-50 p-3 text-rose-500">
-              <BarChart3 className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-rose-100">
-            <div
-              className="h-full bg-gradient-to-r from-rose-500 to-orange-400"
-              style={{ width: `${Math.min(100, data.dimensionIssues.length * 6)}%` }}
-            />
-          </div>
-          <Link
-            href="#dimensioner"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-rose-600 hover:text-rose-700"
-          >
-            Visa lista
-            <ArrowUpRight className="h-4 w-4" aria-hidden />
-          </Link>
-        </div>
       </section>
 
       <section className="space-y-6">
@@ -226,19 +198,6 @@ export default async function DashboardPage() {
             `${issue.familySku} – ${issue.familyTitle}`,
             issue.variantSku,
             issue.missingKeys.join(", "),
-          ])}
-        />
-
-        <DetailTable
-          id="dimensioner"
-          title="Misstänkta dimensioner"
-          description="Artiklar med otolkbara eller avvikande storleksvärden."
-          columns={["SKU", "Namn", "Storlek", "Kommentar"]}
-          rows={data.dimensionIssues.map((issue) => [
-            issue.sku,
-            issue.title,
-            issue.size || "—",
-            issue.reason,
           ])}
         />
       </section>

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { getDashboardData } from "../lib/dashboard-metrics";
 import { getAllProducts, getFamilyMaps } from "../lib/product-feed";
+import { normalizeSpecKey } from "../lib/spec-table";
 
 const PLACEHOLDER_IMAGE_URL = "https://www.nilsahlgren.se/gfx/no-image.jpg";
 
@@ -64,7 +65,45 @@ test("variant-only issues exclude parent products", async () => {
     "missing descriptions",
   );
   expectVariants(
-    dashboard.dimensionIssues.map((issue) => issue.sku),
-    "dimension issues",
+    dashboard.familySpecIssues.map((issue) => issue.variantSku),
+    "families",
   );
+});
+
+test("family spec issues are based on child specs only", async () => {
+  const [dashboard, familyMaps, products] = await Promise.all([
+    getDashboardData(),
+    getFamilyMaps(),
+    getAllProducts(),
+  ]);
+
+  const { parentBySku, variantsByParentSku } = familyMaps;
+  const productIndex = new Map(products.map((product) => [product.articleNumber, product]));
+
+  assert.ok(dashboard.familySpecIssues.length > 0, "should find at least one family issue");
+
+  dashboard.familySpecIssues.forEach((issue) => {
+    const parentSku = parentBySku.get(issue.variantSku);
+    assert.notEqual(parentSku, null, "family issues should reference a variant with a parent");
+
+    const variants = variantsByParentSku.get(parentSku as string) ?? [];
+    const childKeys = new Set<string>();
+
+    variants.forEach((variant) => {
+      const product = productIndex.get(variant.articleNumber);
+      product?.specs.forEach((spec) => {
+        const normalizedKey = normalizeSpecKey(spec.key);
+        if (normalizedKey && spec.value.trim()) {
+          childKeys.add(normalizedKey);
+        }
+      });
+    });
+
+    issue.missingKeys.forEach((missingKey) => {
+      assert.ok(
+        childKeys.has(missingKey),
+        `missing key ${missingKey} should exist on at least one child in the family`,
+      );
+    });
+  });
 });
