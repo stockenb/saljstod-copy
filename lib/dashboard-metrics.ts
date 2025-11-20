@@ -13,7 +13,6 @@ export type DashboardStats = {
   parentProducts: number;
   variants: number;
   categories: number;
-  deepestCategoryLevel: number;
   uniqueSpecKeys: number;
 };
 
@@ -87,39 +86,48 @@ function collectCategoryPaths(categories: ProductCategory[]): CategoryLookup {
   return lookup;
 }
 
-function countCategoriesAndDepth(categories: ProductCategory[]): {
-  count: number;
-  depth: number;
-} {
+function countCategories(categories: ProductCategory[]): number {
   let count = 0;
-  let depth = 0;
 
-  const visit = (nodes: ProductCategory[], level: number) => {
+  const visit = (nodes: ProductCategory[]) => {
     if (!nodes.length) {
       return;
     }
 
-    depth = Math.max(depth, level);
     nodes.forEach((node) => {
       count += 1;
-      visit(node.children, level + 1);
+      visit(node.children);
     });
   };
 
-  visit(categories, 1);
-  return { count, depth };
+  visit(categories);
+  return count;
 }
+
+const PLACEHOLDER_IMAGE_URL = "https://www.nilsahlgren.se/gfx/no-image.jpg";
 
 function findMissingImage(products: Product[]): Product[] {
-  return products.filter((product) => !product.image || !product.image.trim());
+  return products.filter((product) => product.image?.trim() === PLACEHOLDER_IMAGE_URL);
 }
 
-function findMissingSpecs(products: Product[]): Product[] {
-  return products.filter((product) => !product.specs || product.specs.length === 0);
+function findMissingSpecs(
+  products: Product[],
+  parentBySku: Map<string, string | null>,
+): Product[] {
+  return products.filter(
+    (product) => parentBySku.get(product.articleNumber) !== null && product.specs.length === 0,
+  );
 }
 
-function findMissingDescriptions(products: Product[]): Product[] {
-  return products.filter((product) => !product.description || !product.description.trim());
+function findMissingDescriptions(
+  products: Product[],
+  parentBySku: Map<string, string | null>,
+): Product[] {
+  return products.filter(
+    (product) =>
+      parentBySku.get(product.articleNumber) !== null &&
+      (!product.description || !product.description.trim()),
+  );
 }
 
 function resolveUniqueSpecKeys(products: Product[]): number {
@@ -141,6 +149,17 @@ function buildProductIndex(products: Product[]): Map<string, Product> {
     index.set(product.articleNumber, product);
     return index;
   }, new Map());
+}
+
+function dedupeProducts(products: Product[]): Product[] {
+  const index = new Map<string, Product>();
+  products.forEach((product) => {
+    if (!index.has(product.articleNumber)) {
+      index.set(product.articleNumber, product);
+    }
+  });
+
+  return Array.from(index.values());
 }
 
 function detectFamilySpecIssues(
@@ -229,7 +248,11 @@ function detectDimensionIssues(
     return [parent, ...variants];
   };
 
-  const evaluateIssue = (product: Product) => {
+    const evaluateIssue = (product: Product) => {
+    if (parentBySku.get(product.articleNumber) === null) {
+      return;
+    }
+
     const sizeValue = getSizeValue(product.specs);
     if (!sizeValue.trim()) {
       issues.push({
@@ -302,14 +325,18 @@ export async function getDashboardData(): Promise<DashboardData> {
     getFamilyMaps(),
   ]);
 
-  const productIndex = buildProductIndex(products);
+  const uniqueProducts = dedupeProducts(products);
+  const productIndex = buildProductIndex(uniqueProducts);
   const { variantsByParentSku, parentBySku } = familyMaps;
-  const { count: categoryCount, depth: categoryDepth } =
-    countCategoriesAndDepth(categories);
+  const categoryCount = countCategories(categories);
 
-  const missingImageProducts = findMissingImage(products);
-  const missingSpecsProducts = findMissingSpecs(products);
-  const missingDescriptionProducts = findMissingDescriptions(products);
+  const variantProducts = uniqueProducts.filter(
+    (product) => parentBySku.get(product.articleNumber) !== null,
+  );
+
+  const missingImageProducts = findMissingImage(uniqueProducts);
+  const missingSpecsProducts = findMissingSpecs(variantProducts, parentBySku);
+  const missingDescriptionProducts = findMissingDescriptions(variantProducts, parentBySku);
 
   const { issues: familySpecIssues, inconsistentFamilies } = detectFamilySpecIssues(
     productIndex,
@@ -324,13 +351,16 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const categoryLookup = collectCategoryPaths(categories);
 
+  const uniqueSkus = new Set(uniqueProducts.map((product) => product.articleNumber));
+  const parentSkus = Array.from(uniqueSkus).filter((sku) => parentBySku.get(sku) === null);
+  const variantSkus = Array.from(uniqueSkus).filter((sku) => parentBySku.get(sku) !== null);
+
   const stats: DashboardStats = {
-    totalProducts: products.length,
-    parentProducts: Array.from(parentBySku.values()).filter((value) => value === null).length,
-    variants: Array.from(parentBySku.values()).filter((value) => value !== null).length,
+    totalProducts: uniqueSkus.size,
+    parentProducts: parentSkus.length,
+    variants: variantSkus.length,
     categories: categoryCount,
-    deepestCategoryLevel: categoryDepth,
-    uniqueSpecKeys: resolveUniqueSpecKeys(products),
+    uniqueSpecKeys: resolveUniqueSpecKeys(uniqueProducts),
   };
 
   const dataQualityCounts: DataQualityCounts = {

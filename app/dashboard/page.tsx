@@ -13,7 +13,6 @@ export default async function DashboardPage() {
     { label: "Moderartiklar", value: data.stats.parentProducts },
     { label: "Varianter", value: data.stats.variants },
     { label: "Kategorier", value: data.stats.categories },
-    { label: "Djupaste kategorinivå", value: data.stats.deepestCategoryLevel },
     { label: "Unika specifikationsnycklar", value: data.stats.uniqueSpecKeys },
   ];
 
