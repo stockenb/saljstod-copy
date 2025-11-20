@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
+import { buildSortableArticle, compareSortableArticles } from "@/lib/article-sorting";
 import { PACKAGING_FILTER_VALUES, type PackagingFilterValue } from "@/lib/artikelbas-filters";
 import {
   collectSpecColumns,
@@ -108,6 +109,38 @@ const CATALOG_HIDDEN_SPEC_KEYS = [
 ];
 
 const CATALOG_SPEC_FILTER_OPTIONS = { hiddenKeys: CATALOG_HIDDEN_SPEC_KEYS } as const;
+
+function createSpecMap(specs: ProductSpecification[]): Map<string, string> {
+  return specs.reduce<Map<string, string>>((map, spec) => {
+    const label = spec.key.trim() || "Specifikation";
+    map.set(label, (spec.value ?? "").trim());
+    return map;
+  }, new Map());
+}
+
+function getSpecValue(
+  specMap: Map<string, string>,
+  matcher: (normalizedLabel: string) => boolean,
+): string | null {
+  for (const [label, value] of specMap.entries()) {
+    if (matcher(normalizeSpecKey(label))) {
+      const trimmed = (value ?? "").trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function getPackagingValue(specMap: Map<string, string>) {
+  return (
+    getSpecValue(specMap, (label) => label === "primärförpackning") ??
+    getSpecValue(specMap, (label) => label.includes("primärförpackning")) ??
+    null
+  );
+}
 
 type SelectionState = Record<string, boolean>;
 type PackagingSelectionState = Record<PackagingFilterValue, boolean>;
@@ -984,6 +1017,7 @@ async function generateCatalogPdf(
     const imageMaxHeight = 60;
     const columnGap = 8;
     let imageDimensions: { width: number; height: number } | null = null;
+    let imageAsset: { dataUrl: string; format: string } | null = null;
 
     if (product.image) {
       try {
@@ -1001,26 +1035,19 @@ async function generateCatalogPdf(
           imageWidth = (image.width / image.height) * imageHeight;
         }
         imageDimensions = { width: imageWidth, height: imageHeight };
-        doc.addImage(
-          image.dataUrl,
-          image.format,
-          pageMarginX,
-          blockStartY,
-          imageWidth,
-          imageHeight,
-          undefined,
-          "FAST",
-        );
+        imageAsset = { dataUrl: image.dataUrl, format: image.format };
       } catch (error) {
         console.warn("Kunde inte läsa produktbild", error);
       }
     }
 
     const hasImage = Boolean(imageDimensions);
-    const textX = hasImage ? pageMarginX + (imageDimensions?.width ?? 0) + columnGap : pageMarginX;
-    const minTextWidth = hasImage ? contentWidth * 0.45 : contentWidth;
-    const computedWidth = contentWidth - (hasImage ? (imageDimensions?.width ?? 0) + columnGap : 0);
-    const descriptionWidth = Math.max(minTextWidth, computedWidth > 0 ? computedWidth : minTextWidth);
+    const reservedWidth = hasImage ? (imageDimensions?.width ?? 0) + columnGap : 0;
+    const descriptionWidth = hasImage
+      ? Math.max(0, contentWidth - reservedWidth)
+      : contentWidth;
+    const textX = pageMarginX;
+    const imageX = hasImage ? pageMarginX + descriptionWidth + columnGap : pageMarginX;
     let textBottom = blockStartY;
     const sanitizedDescription = normalizePdfText(product.description);
 
@@ -1033,6 +1060,19 @@ async function generateCatalogPdf(
         doc.text(descriptionLines, textX, blockStartY);
         textBottom = blockStartY + descriptionLines.length * 4.4;
       }
+    }
+
+    if (hasImage && imageDimensions && imageAsset) {
+      doc.addImage(
+        imageAsset.dataUrl,
+        imageAsset.format,
+        imageX,
+        blockStartY,
+        imageDimensions.width,
+        imageDimensions.height,
+        undefined,
+        "FAST",
+      );
     }
 
     const imageBottom = hasImage ? blockStartY + (imageDimensions?.height ?? 0) : blockStartY;
@@ -1051,11 +1091,30 @@ async function generateCatalogPdf(
       "Storlek",
       ...otherColumns.map((column) => normalizePdfText(column.label)),
     ];
-    const tableBody = rows.map((row) => [
+    const sortableRows = rows
+      .map((row) => {
+        const specMap = createSpecMap(row.specs);
+        const sizeValue = getSpecValueForColumn(row, sizeColumn, CATALOG_SPEC_FILTER_OPTIONS);
+        const packaging = getPackagingValue(specMap);
+
+        return {
+          row,
+          sortable: buildSortableArticle(
+            {
+              articleNumber: row.articleNumber,
+              sizeValue,
+              packaging,
+              specMap,
+            },
+            normalizeSpecKey,
+          ),
+        };
+      })
+      .sort((a, b) => compareSortableArticles(a.sortable, b.sortable));
+
+    const tableBody = sortableRows.map(({ row, sortable }) => [
       normalizePdfText(row.articleNumber),
-      normalizePdfText(
-        formatSpecValue(getSpecValueForColumn(row, sizeColumn, CATALOG_SPEC_FILTER_OPTIONS)),
-      ),
+      normalizePdfText(formatSpecValue(sortable.sizeValue ?? "")),
       ...otherColumns.map((column) =>
         normalizePdfText(
           formatSpecValue(getSpecValueForColumn(row, column, CATALOG_SPEC_FILTER_OPTIONS)),

@@ -6,6 +6,7 @@ import type { jsPDF } from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { buildSortableArticle, compareSortableArticles } from "@/lib/article-sorting";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
 import { analyzeProductTitles } from "@/lib/product-title";
 
@@ -73,48 +74,6 @@ function normalizeSpecKey(label: string) {
 
 const NORMALIZED_SIZE_KEY = normalizeSpecKey("Storlek");
 
-function normalizeSwedishDecimal(value: string): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.replace(/\s+/g, "").replace(/,/g, ".");
-  const parsed = Number.parseFloat(normalized);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-function findFirstNumericValue(text: string | null | undefined): number | null {
-  if (!text) {
-    return null;
-  }
-
-  const match = text.match(/\d+(?:[.,]\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  return normalizeSwedishDecimal(match[0]) ?? null;
-}
-
-function parseSizeMetrics(sizeText: string) {
-  const normalizedSize = sizeText.replace(/,/g, ".");
-  const match = normalizedSize.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
-
-  if (!match) {
-    const fallback = findFirstNumericValue(sizeText);
-    return {
-      thickness: fallback,
-      length: null as number | null,
-    };
-  }
-
-  const [, thicknessRaw, lengthRaw] = match;
-  const thickness = normalizeSwedishDecimal(thicknessRaw);
-  const length = normalizeSwedishDecimal(lengthRaw);
-
-  return { thickness, length };
-}
-
 function getSpecValue(
   specMap: Map<string, string>,
   matcher: (normalizedLabel: string) => boolean,
@@ -154,101 +113,6 @@ function isPrimaryPackagingQuantityLabel(normalizedLabel: string) {
   }
 
   return normalizedLabel.includes("antal");
-}
-
-const PACKAGING_RANK = {
-  sb: 0,
-  paket: 1,
-  hink: 2,
-  bulk: 3,
-  other: 4,
-} as const;
-
-type PackagingRank = (typeof PACKAGING_RANK)[keyof typeof PACKAGING_RANK];
-
-function normalizePackagingLabel(packaging: string | null | undefined) {
-  return (packaging ?? "")
-    .normalize("NFKC")
-    .toLocaleLowerCase("sv-SE")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isBulkPackaging(articleNumber: string, normalizedPackaging: string) {
-  const normalizedArticleNumber = articleNumber.normalize("NFKC").toUpperCase();
-
-  if (normalizedArticleNumber.startsWith("B")) {
-    return true;
-  }
-
-  return (
-    normalizedPackaging.includes("bulk") || normalizedPackaging.includes("kartong")
-  );
-}
-
-function resolvePackagingRank(
-  articleNumber: string,
-  normalizedPackaging: string,
-): PackagingRank {
-  if (isBulkPackaging(articleNumber, normalizedPackaging)) {
-    return PACKAGING_RANK.bulk;
-  }
-
-  if (
-    normalizedPackaging.includes("sb") ||
-    normalizedPackaging.includes("småpack") ||
-    normalizedPackaging.includes("småförpackning")
-  ) {
-    return PACKAGING_RANK.sb;
-  }
-
-  if (normalizedPackaging.includes("paket")) {
-    return PACKAGING_RANK.paket;
-  }
-
-  if (normalizedPackaging.includes("hink")) {
-    return PACKAGING_RANK.hink;
-  }
-
-  return PACKAGING_RANK.other;
-}
-
-const QUANTITY_SPEC_PATTERNS = [
-  "antal",
-  "förpackning",
-  "st/",
-  "st per",
-  "per förp",
-  "per fp",
-  "hink",
-  "sb",
-  "paket",
-  "bulk",
-  "kartong",
-];
-
-function resolvePackagingQuantity(
-  specMap: Map<string, string>,
-  packaging: string | null,
-): number | null {
-  const packagingQuantity = findFirstNumericValue(packaging ?? "");
-  if (packagingQuantity !== null) {
-    return packagingQuantity;
-  }
-
-  for (const [label, value] of specMap.entries()) {
-    const normalizedLabel = normalizeSpecKey(label);
-    if (!QUANTITY_SPEC_PATTERNS.some((pattern) => normalizedLabel.includes(pattern))) {
-      continue;
-    }
-
-    const numericValue = findFirstNumericValue(value);
-    if (numericValue !== null) {
-      return numericValue;
-    }
-  }
-
-  return null;
 }
 
 function normalizeUrl(raw: string): string {
@@ -1040,75 +904,8 @@ export default function CombinedProductSheetClientPage() {
           ...filteredSpecLabels.map((label) => sanitizePdfText(label)),
         ]);
         const tableBody = articleEntries
-          .map((entry) => {
-            const sizeMetrics = parseSizeMetrics(entry.sizeValue);
-            const normalizedPackaging = normalizePackagingLabel(
-              entry.packaging ?? null,
-            );
-            const packagingRank = resolvePackagingRank(
-              entry.articleNumber,
-              normalizedPackaging,
-            );
-            const packagingQuantity = resolvePackagingQuantity(
-              entry.specMap,
-              entry.packaging ?? null,
-            );
-            const isBulk = isBulkPackaging(
-              entry.articleNumber,
-              normalizedPackaging,
-            );
-
-            return {
-              ...entry,
-              sizeMetrics,
-              packagingRank,
-              packagingQuantity,
-              isBulk,
-            };
-          })
-          .sort((a, b) => {
-            const thicknessA =
-              a.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
-            const thicknessB =
-              b.sizeMetrics.thickness ?? Number.POSITIVE_INFINITY;
-            if (thicknessA !== thicknessB) {
-              return thicknessA - thicknessB;
-            }
-
-            const lengthA = a.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
-            const lengthB = b.sizeMetrics.length ?? Number.POSITIVE_INFINITY;
-            if (lengthA !== lengthB) {
-              return lengthA - lengthB;
-            }
-
-            if (a.isBulk !== b.isBulk) {
-              return a.isBulk ? 1 : -1;
-            }
-
-            if (a.packagingRank !== b.packagingRank) {
-              return a.packagingRank - b.packagingRank;
-            }
-
-            const quantityA = a.packagingQuantity ?? Number.POSITIVE_INFINITY;
-            const quantityB = b.packagingQuantity ?? Number.POSITIVE_INFINITY;
-            if (quantityA !== quantityB) {
-              return quantityA - quantityB;
-            }
-
-            const packagingCompare = (a.packaging ?? "").localeCompare(
-              b.packaging ?? "",
-              "sv-SE",
-              { sensitivity: "accent" },
-            );
-            if (packagingCompare !== 0) {
-              return packagingCompare;
-            }
-
-            return a.articleNumber.localeCompare(b.articleNumber, "sv-SE", {
-              numeric: true,
-              sensitivity: "base",
-            });
-          })
+          .map((entry) => buildSortableArticle(entry, normalizeSpecKey))
+          .sort(compareSortableArticles)
           .map((entry) => {
             const rowValues = filteredSpecLabels.map((label) =>
               displayValue(entry.specMap.get(label)),
