@@ -36,13 +36,7 @@ const primaryCards: Card[] = [
 ];
 
 const secondaryCards: Card[] = [
-  {
-    href: "/dashboard",
-    title: "Dashboard",
-    description: "Visualisera produktflöde och datakvalitet.",
-    emoji: "📊",
-    variant: "compact" as const,
-  },
+
   {
     href: "/produktblad",
     title: "Skapa produktblad",
@@ -65,17 +59,28 @@ const secondaryCards: Card[] = [
     variant: "compact" as const,
   },
   {
-    href: "/ean",
-    title: "Skapa EAN",
-    description: "Skapa egna EAN13-koder.",
-    emoji: "🏷️",
-    variant: "compact" as const,
-  },
-  {
     href: "",
     title: "Generera katalog",
     description: "Generera katalog utifrån valda kategorier.",
     emoji: "📒",
+    variant: "compact" as const,
+  },
+  
+];
+
+const statCards: Card[] = [
+    {
+    href: "/dashboard",
+    title: "Dashboard",
+    description: "Visualisera produktflöde och datakvalitet.",
+    emoji: "📊",
+    variant: "compact" as const,
+  },
+    {
+    href: "/ean",
+    title: "Skapa EAN",
+    description: "Skapa egna EAN13-koder.",
+    emoji: "🏷️",
     variant: "compact" as const,
   },
   
@@ -189,14 +194,25 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75">
               <h3 className="text-m font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 mt-8">
-                Övriga verktyg
+                PRODUKTVERKTYG
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {secondaryCards.map((card) => (
                   <CardLink key={`${card.title}-${card.href}`} card={card} />
                 ))}
               </div>
+                          <div className="flex flex-col gap-4 rounded-2xl border border-white/60 bg-white/75">
+              <h3 className="text-m font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4 mt-8">
+                Statistik & övrigt
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {statCards.map((card) => (
+                  <CardLink key={`${card.title}-${card.href}`} card={card} />
+                ))}
+              </div>
             </div>
+            </div>
+            
           </div>
         </section>
       </div>

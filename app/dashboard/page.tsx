@@ -33,7 +33,7 @@ export default async function DashboardPage() {
       id: "missing-description",
       title: "Produkter utan beskrivning",
       value: data.dataQualityCounts.missingDescription,
-      description: "saknar FullDescription",
+      description: "saknar artikelbeskrivning",
     },
   ];
 
@@ -116,12 +116,12 @@ export default async function DashboardPage() {
         <div className="relative overflow-hidden rounded-2xl border border-indigo-50 bg-white p-5 shadow-[0_16px_40px_rgba(79,70,229,0.14)]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-indigo-500">Familjeavvikelser</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-indigo-500">Avvikelser</p>
               <div className="mt-2 text-3xl font-semibold text-slate-900">
                 {data.inconsistentFamilyCount.toLocaleString("sv-SE")}
               </div>
               <p className="text-sm text-slate-600">
-                Familjer med inkonsekventa specifikationer (saknade värden i vissa artiklar).
+                Artikelfamiljer med inkonsekventa specifikationer (saknade värden i vissa artiklar).
               </p>
             </div>
             <div className="rounded-full bg-indigo-50 p-3 text-indigo-500">
