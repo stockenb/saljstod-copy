@@ -3,9 +3,8 @@
 import Image, { StaticImageData } from "next/image";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search, ArrowUpRight, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   type PackagingFilterValue,
   PACKAGING_FILTER_VALUES,
@@ -34,31 +33,17 @@ type FamilyArticle = {
 };
 
 type FetchStatus = "idle" | "loading" | "success" | "error";
+
 export default function ArtikelbasPage() {
   const [query, setQuery] = useState("");
-  const [excludeBulk, setExcludeBulk] = useState(false);
   const [packagingFilters, setPackagingFilters] = useState<PackagingFilterValue[]>([]);
   const [articles, setArticles] = useState<FamilyArticle[]>([]);
   const [status, setStatus] = useState<FetchStatus>("idle");
   const [message, setMessage] = useState("");
   const router = useRouter();
 
-  const messageClasses = useMemo(() => {
-    switch (status) {
-      case "error":
-        return "text-sm text-danger";
-      case "success":
-        return "text-sm text-emerald-600";
-      case "loading":
-        return "text-sm text-neutral-500";
-      default:
-        return "text-sm text-neutral-500";
-    }
-  }, [status]);
-
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     const trimmed = query.trim();
 
     if (!trimmed) {
@@ -74,197 +59,222 @@ export default function ArtikelbasPage() {
     try {
       const params = new URLSearchParams();
       params.set("q", trimmed);
-      if (excludeBulk) {
-        params.set("excludeBulk", "1");
-      }
       PACKAGING_FILTER_VALUES.forEach((filter) => {
         if (packagingFilters.includes(filter)) {
           params.append("packaging", filter);
         }
       });
 
-      const response = await fetch(`/api/artikelbas/family?${params.toString()}`, {
-        method: "GET",
-      });
+      const response = await fetch(`/api/artikelbas/family?${params.toString()}`);
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(data?.error || "Kunde inte hämta artiklar.");
       }
 
       const data = (await response.json()) as { articles: FamilyArticle[] };
       setArticles(data.articles);
 
-      if (data.articles.length === 0) {
-        setStatus("success");
-        setMessage("Inga artiklar hittades.");
-      } else {
-        const count = data.articles.length;
-        setStatus("success");
-        setMessage(`Hittade ${count} artikel${count === 1 ? "" : "ar"}.`);
-      }
+      const count = data.articles.length;
+      setStatus("success");
+      setMessage(
+        count === 0
+          ? "Inga artiklar hittades."
+          : `Hittade ${count} artikel${count === 1 ? "" : "ar"}.`
+      );
     } catch (error) {
       console.error(error);
       setStatus("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Ett oväntat fel inträffade.",
-      );
+      setMessage(error instanceof Error ? error.message : "Ett oväntat fel inträffade.");
     }
   };
 
   const handleCreateProductSheet = () => {
-    if (articles.length === 0) {
-      return;
-    }
-
-    const articleNumbers = articles.map((article) => article.articleNumber);
+    if (articles.length === 0) return;
     const params = new URLSearchParams();
-    params.set("artiklar", articleNumbers.join(","));
-
+    params.set("artiklar", articles.map((a) => a.articleNumber).join(","));
     router.push(`/produktblad/samlat?${params.toString()}`);
   };
 
   return (
-    <div className="space-y-10 mt-10">
-      <div className="max-w-3xl space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
+    <div className="mx-auto max-w-6xl space-y-10">
+
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div>
+        <p className="mb-2 text-[11px] font-semibold tracking-[0.25em] text-violet-400 uppercase">
+          Verktyg
+        </p>
+        <h1 className="text-3xl font-black tracking-tight text-gray-100" style={{ letterSpacing: "-0.02em" }}>
           Artikelbas
         </h1>
-        <p className="text-sm text-neutral-600">
-          Sök fram en produktfamilj och skapa ett samlat produktblad för alla
-          matchande artiklar.
+        <p className="mt-2 text-sm text-gray-300">
+          Sök fram en produktfamilj och skapa ett samlat produktblad för alla matchande artiklar.
         </p>
       </div>
 
-      <section className="space-y-6 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="flex flex-col gap-2">
-            <label
-              className="text-sm font-medium text-neutral-700"
-              htmlFor="artikelbas-query"
-            >
+      {/* ── Söksektion ─────────────────────────────────────── */}
+      <div className="rounded-2xl border border-white/[0.30] bg-white/[0.16] p-6 space-y-6">
+
+        <form onSubmit={handleSearch} className="space-y-6">
+
+          {/* Sökfält */}
+          <div className="space-y-2">
+            <label htmlFor="artikelbas-query" className="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">
               Sök produktfamilj
             </label>
-            <Input
-              id="artikelbas-query"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Exempel: %T-Bite%"
-            />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              <input
+                id="artikelbas-query"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Exempel: %T-Bite%"
+                className="w-full rounded-xl border border-white/[0.32] bg-white/[0.16] py-3 pl-11 pr-4 text-sm text-gray-200 placeholder-gray-500 outline-none transition-all focus:border-violet-500/50 focus:bg-white/[0.12] focus:ring-1 focus:ring-violet-500/30"
+              />
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-neutral-700">
-                Ta endast med följande:
-              </legend>
-              <div className="grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-8">
-                {PACKAGING_FILTER_OPTIONS.map((option) => {
-                  const isChecked = packagingFilters.includes(option.value);
+          {/* Förpackningsfilter */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">
+              Filtrera förpackningstyp
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PACKAGING_FILTER_OPTIONS.map((option) => {
+                const isChecked = packagingFilters.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={isChecked}
+                    onClick={() =>
+                      setPackagingFilters((cur) =>
+                        cur.includes(option.value)
+                          ? cur.filter((v) => v !== option.value)
+                          : [...cur, option.value]
+                      )
+                    }
+                    className={`relative flex flex-col items-center gap-2 rounded-xl border p-4 text-xs font-medium transition-all duration-200 ${
+                      isChecked
+                        ? "border-violet-500/40 bg-violet-500/10 text-violet-200"
+                        : "border-white/[0.30] bg-white/[0.16] text-gray-300 hover:border-white/[0.25] hover:bg-white/[0.13] hover:text-gray-200"
+                    }`}
+                  >
+                    {isChecked && (
+                      <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-violet-400" />
+                    )}
+                    <div className="h-12 w-12 overflow-hidden p-1">
+                      <Image
+                        src={option.image}
+                        alt={option.label}
+                        className="h-full w-full object-contain brightness-90"
+                        sizes="48px"
+                        priority
+                      />
+                    </div>
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={isChecked}
-                      onClick={() =>
-                        setPackagingFilters((current) => {
-                          if (current.includes(option.value)) {
-                            return current.filter((value) => value !== option.value);
-                          }
-
-                          return [...current, option.value];
-                        })
-                      }
-                      className={`group relative flex w-full max-w-[120px] flex-col items-center gap-1.5 rounded-lg border px-2 py-2 text-[13px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 ${
-                        isChecked
-                          ? "border-accent bg-neutral-50 shadow-sm hover:shadow"
-                          : "border-neutral-200 bg-transparent hover:bg-neutral-50/60 hover:shadow-sm"
-                      }`}
-                    >
-                      {isChecked ? (
-                        <span
-                          className="absolute right-2 bottom-4 h-2 w-2 rounded-full bg-accent"
-                          aria-hidden
-                        />
-                      ) : null}
-                      <div className="relative isolate aspect-square w-full max-w-[64px] overflow-hidden p-1 transition">
-                        <Image
-                          src={option.image}
-                          alt={option.label}
-                          className="h-full w-full object-contain"
-                          sizes="(min-width: 640px) 72px, 72px"
-                          priority
-                        />
-                      </div>
-                      <span className="text-center text-neutral-800">{option.label}</span>
-                    </button>
-                  );
-                })}
+          {/* Submit + status */}
+          <div className="flex items-center justify-between gap-4">
+            {message ? (
+              <div className="flex items-center gap-2">
+                {status === "loading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />}
+                {status === "error" && <AlertCircle className="h-3.5 w-3.5 text-red-400" />}
+                {status === "success" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
+                <p className={`text-xs ${
+                  status === "error" ? "text-red-400" :
+                  status === "success" ? "text-emerald-400" : "text-gray-400"
+                }`}>
+                  {message}
+                </p>
               </div>
-            </fieldset>
-          </div>
+            ) : <div />}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <Button type="submit" className="w-full sm:w-auto">
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
+            >
+              {status === "loading" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
               Sök artiklar
-            </Button>
+            </button>
           </div>
         </form>
-        {message ? <p className={messageClasses}>{message}</p> : null}
-      </section>
+      </div>
 
-      <section className="space-y-4 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Träfflista ─────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-neutral-900">
+            <h2 className="text-lg font-bold tracking-tight text-gray-100" style={{ letterSpacing: "-0.01em" }}>
               Träfflista
             </h2>
-            <p className="text-sm text-neutral-600">
+            <p className="mt-0.5 text-xs text-gray-400">
               {articles.length === 0
                 ? "Sök efter en produktfamilj för att se artiklar här."
-                : "Alla artiklar som matchar din sökning."}
+                : `${articles.length} artikel${articles.length === 1 ? "" : "ar"} matchar sökningen.`}
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleCreateProductSheet}
-              disabled={articles.length === 0}
-              className="w-full sm:w-auto"
-            >
-              Spara urval och skapa produktblad
-            </Button>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          {articles.length === 0 ? (
-            <p className="text-sm text-neutral-500">
-              Inga artiklar att visa ännu.
-            </p>
-          ) : (
-            <ul className="divide-y divide-neutral-200 overflow-hidden rounded-2xl border border-neutral-200 bg-white/80">
-              {articles.map((article) => (
-                <li key={article.articleNumber} className="p-4">
-                  <p className="text-xs uppercase tracking-wide text-neutral-500">
-                    Artikelnummer
-                  </p>
-                  <p className="text-base font-semibold text-neutral-900">
-                    {article.articleNumber}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-700">{article.title}</p>
-                </li>
-              ))}
-            </ul>
+          {articles.length > 0 && (
+            <button
+              type="button"
+              onClick={handleCreateProductSheet}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.32] bg-white/[0.16] px-4 py-2 text-xs font-semibold text-gray-300 transition-all duration-200 hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-violet-200"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Skapa samlat produktblad
+            </button>
           )}
         </div>
-      </section>
+
+        {articles.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-white/[0.30] py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.30] bg-white/[0.16] text-gray-500">
+              <Search className="h-5 w-5" />
+            </div>
+            <p className="text-sm text-gray-500">Inga artiklar att visa ännu.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-white/[0.30]">
+            {articles.map((article, i) => (
+              <div
+                key={article.articleNumber}
+                className={`flex items-center gap-5 px-5 py-4 transition-colors hover:bg-white/[0.16] ${
+                  i !== articles.length - 1 ? "border-b border-white/[0.30]" : ""
+                }`}
+              >
+                {/* Nummer */}
+                <div className="shrink-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">Art.nr</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold text-violet-300">
+                    {article.articleNumber}
+                  </p>
+                </div>
+
+                {/* Separator */}
+                <div className="h-8 w-px bg-white/[0.16]" />
+
+                {/* Titel */}
+                <p className="flex-1 text-sm text-gray-300">{article.title}</p>
+
+                {/* Arrow */}
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

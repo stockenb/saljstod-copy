@@ -401,17 +401,19 @@ export async function getProductByArticleNumber(
     return null;
   }
 
-  const { products } = await loadFeedData();
-  return products.find((product) => product.articleNumber === trimmed) ?? null;
+  const { productIndex } = await loadFeedData();
+  return productIndex.get(trimmed) ?? null;
 }
 
 export async function getProductsByArticleNumbers(
   articleNumbers: string[],
 ): Promise<Product[]> {
   const targets = new Set(articleNumbers.map((value) => value.trim()).filter(Boolean));
-  const { products } = await loadFeedData();
+  const { productIndex } = await loadFeedData();
 
-  return products.filter((product) => targets.has(product.articleNumber));
+  return Array.from(targets)
+    .map((sku) => productIndex.get(sku))
+    .filter((product): product is Product => product !== undefined);
 }
 
 export async function getProductWithVariantsBySku(
@@ -442,16 +444,7 @@ export async function getFamilyMaps(): Promise<{
   variantsByParentSku: Map<string, Product[]>;
 }> {
   const { parentBySku, variantsByParentSku } = await loadFeedData();
-
-  const clonedParentMap = new Map(parentBySku);
-  const clonedVariantMap = new Map(
-    Array.from(variantsByParentSku.entries()).map(([parentSku, variants]) => [
-      parentSku,
-      [...variants],
-    ]),
-  );
-
-  return { parentBySku: clonedParentMap, variantsByParentSku: clonedVariantMap };
+  return { parentBySku, variantsByParentSku };
 }
 
 export async function getCategoryTree(): Promise<ProductCategory[]> {

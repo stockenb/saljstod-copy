@@ -1,0 +1,7 @@
+  47 |   if (loading || !user) return null;
+  48 |
+> 49 |   useEffect(() => {
+     |             ^
+  50 |     setIsMenuOpen(false);
+  51 |     setIsToolsOpen(false);
+  52 |   }, [pathname]);

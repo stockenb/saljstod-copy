@@ -32,9 +32,13 @@ function shouldKeepRow(
     return true;
   }
 
-  return Array.from(packagingFilters).some((filter) =>
-    matchesPackagingFilter({ articleNumber: sku, primaryPackaging }, filter),
-  );
+  for (const filter of packagingFilters) {
+    if (matchesPackagingFilter({ articleNumber: sku, primaryPackaging }, filter)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function filterCatalogProducts(
@@ -45,17 +49,10 @@ export function filterCatalogProducts(
   const excludeSkus = new Set(normalizeSkuList(options.excludeSkus));
   const includeSkus = new Set(normalizeSkuList(options.includeSkus));
 
-  // Exclusions take precedence over inclusions
-  excludeSkus.forEach((sku) => {
-    if (includeSkus.has(sku)) {
-      includeSkus.delete(sku);
-    }
-  });
-
   return products
     .filter((product) => !excludeSkus.has(product.articleNumber))
     .map((product) => {
-      const variants = product.variants ?? [];
+      const variants = product.variants;
       const filteredVariants = variants
         .filter((variant) => !excludeSkus.has(variant.articleNumber))
         .filter((variant) =>
@@ -82,17 +79,7 @@ export function filterCatalogProducts(
         return { ...product, variants: filteredVariants };
       }
 
-      const keepParent = shouldKeepRow(
-        product.articleNumber,
-        product.primaryPackaging,
-        packagingFilters,
-        includeSkus,
-      );
-
-      if (!keepParent) {
-        if (includeSkus.has(product.articleNumber)) {
-          return product;
-        }
+      if (!shouldKeepRow(product.articleNumber, product.primaryPackaging, packagingFilters, includeSkus)) {
         return null;
       }
 

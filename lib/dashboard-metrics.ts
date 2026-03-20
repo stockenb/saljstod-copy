@@ -135,14 +135,7 @@ function resolveUniqueSpecKeys(products: Product[]): number {
   return keys.size;
 }
 
-function buildProductIndex(products: Product[]): Map<string, Product> {
-  return products.reduce<Map<string, Product>>((index, product) => {
-    index.set(product.articleNumber, product);
-    return index;
-  }, new Map());
-}
-
-function dedupeProducts(products: Product[]): Product[] {
+function dedupeProducts(products: Product[]): { deduped: Product[]; index: Map<string, Product> } {
   const index = new Map<string, Product>();
   products.forEach((product) => {
     if (!index.has(product.articleNumber)) {
@@ -150,7 +143,7 @@ function dedupeProducts(products: Product[]): Product[] {
     }
   });
 
-  return Array.from(index.values());
+  return { deduped: Array.from(index.values()), index };
 }
 
 function detectFamilySpecIssues(
@@ -216,8 +209,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     getFamilyMaps(),
   ]);
 
-  const uniqueProducts = dedupeProducts(products);
-  const productIndex = buildProductIndex(uniqueProducts);
+  const { deduped: uniqueProducts, index: productIndex } = dedupeProducts(products);
   const { variantsByParentSku, parentBySku } = familyMaps;
   const categoryCount = countCategories(categories);
 

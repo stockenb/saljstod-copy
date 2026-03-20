@@ -1,149 +1,152 @@
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, CheckCircle2, ImageOff, Info } from "lucide-react";
-
+import { ArrowUpRight, BarChart3, CheckCircle2, Info, AlertTriangle, ImageOff, FileX, AlignLeft } from "lucide-react";
 import { getDashboardData } from "@/lib/dashboard-metrics";
-
-const funCardIcons = [BarChart3, CheckCircle2, Info];
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
 
-  const funFacts = [
-    { label: "Artiklar totalt", value: data.stats.totalProducts },
-    { label: "Moderartiklar", value: data.stats.parentProducts },
-    { label: "Varianter", value: data.stats.variants },
-    { label: "Kategorier", value: data.stats.categories },
-    { label: "Unika specifikationsnycklar", value: data.stats.uniqueSpecKeys },
+  const stats = [
+    { label: "Artiklar totalt", value: data.stats.totalProducts, color: "text-violet-300", bar: "bg-violet-400" },
+    { label: "Moderartiklar", value: data.stats.parentProducts, color: "text-indigo-300", bar: "bg-indigo-400" },
+    { label: "Varianter", value: data.stats.variants, color: "text-sky-300", bar: "bg-sky-400" },
+    { label: "Kategorier", value: data.stats.categories, color: "text-emerald-300", bar: "bg-emerald-400" },
+    { label: "Spec-nycklar", value: data.stats.uniqueSpecKeys, color: "text-teal-300", bar: "bg-teal-400" },
   ];
 
-  const dataQualityCards = [
+  const qualityCards = [
     {
       id: "missing-images",
-      title: "Produkter utan bild",
-      value: data.dataQualityCounts.missingImage,
+      title: "Utan bild",
       description: "saknar produktbild",
+      value: data.dataQualityCounts.missingImage,
+      icon: ImageOff,
     },
     {
       id: "missing-specs",
-      title: "Produkter utan teknisk data",
-      value: data.dataQualityCounts.missingSpecs,
+      title: "Utan teknisk data",
       description: "saknar specifikationer",
+      value: data.dataQualityCounts.missingSpecs,
+      icon: FileX,
     },
     {
       id: "missing-description",
-      title: "Produkter utan beskrivning",
-      value: data.dataQualityCounts.missingDescription,
+      title: "Utan beskrivning",
       description: "saknar artikelbeskrivning",
+      value: data.dataQualityCounts.missingDescription,
+      icon: AlignLeft,
     },
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 px-6 pb-16 pt-10 sm:px-10">
-      <div className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Dashboard</p>
-        <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-          Dashboard – produktdata &amp; datakvalitet
+    <div className="mx-auto max-w-6xl space-y-12">
+
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div>
+        <p className="mb-2 text-[11px] font-semibold tracking-[0.25em] text-violet-400 uppercase">
+          Översikt
+        </p>
+        <h1 className="text-3xl font-black tracking-tight text-gray-100" style={{ letterSpacing: "-0.02em" }}>
+          Dashboard
         </h1>
-        <p className="max-w-3xl text-slate-600">
-          Översikt över XML-feedens produkter, kategorier och möjliga kvalitetsavvikelser.
+        <p className="mt-2 text-sm text-gray-400">
+          Produktdata, kategorier och kvalitetsavvikelser från XML-feeden.
         </p>
       </div>
 
-      <section>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {funFacts.map((fact, index) => {
-            const Icon = funCardIcons[index % funCardIcons.length];
+      {/* ── Statistik ──────────────────────────────────────── */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Produktstatistik</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {stats.map((stat, i) => (
+            <div
+              key={stat.label}
+              className="relative overflow-hidden rounded-2xl border border-white/[0.30] bg-white/[0.16] p-5"
+            >
+              {/* Progress bar top */}
+              <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl bg-white/[0.08]">
+                <div
+                  className={`h-full rounded-t-2xl ${stat.bar} opacity-70`}
+                  style={{ width: `${60 + i * 8}%` }}
+                />
+              </div>
+
+              <div className={`text-3xl font-black tracking-tight ${stat.color}`} style={{ letterSpacing: "-0.02em" }}>
+                {stat.value.toLocaleString("sv-SE")}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-400">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Datakvalitet ───────────────────────────────────── */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Datakvalitet</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {qualityCards.map((card) => {
+            const Icon = card.icon;
+            const pct = Math.min(100, Math.max(4, card.value));
             return (
               <div
-                key={fact.label}
-                className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+                key={card.id}
+                className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/[0.07] p-5"
               >
-                <div className="flex items-center justify-between">
-                  <div className="rounded-xl bg-sky-50 p-2 text-sky-600">
-                    <Icon className="h-5 w-5" aria-hidden />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300">
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <div className="flex h-2 w-16 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="bg-gradient-to-r from-sky-400 to-indigo-500"
-                      style={{ width: `${70 + (index % 3) * 10}%` }}
-                    />
-                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-500/70">
+                    Varning
+                  </span>
                 </div>
-                <div className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                  {fact.value.toLocaleString("sv-SE")}
+                <div className="mt-4 text-3xl font-black tracking-tight text-amber-200" style={{ letterSpacing: "-0.02em" }}>
+                  {card.value.toLocaleString("sv-SE")}
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{fact.label}</p>
+                <p className="mt-1 text-xs text-amber-300/70">{card.description}</p>
+                <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-amber-500/15">
+                  <div className="h-full rounded-full bg-amber-400/60" style={{ width: `${pct}%` }} />
+                </div>
+                <Link
+                  href={`#${card.id}`}
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-amber-400 no-underline transition-colors hover:text-amber-300"
+                >
+                  Visa lista <ArrowUpRight className="h-3 w-3" />
+                </Link>
               </div>
             );
           })}
-        </div>
-      </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {dataQualityCards.map((card) => (
-          <div
-            key={card.id}
-            className="relative overflow-hidden rounded-2xl border border-amber-50 bg-amber-50/80 p-5 shadow-[0_14px_34px_rgba(251,191,36,0.25)]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-amber-700">Datakvalitet</p>
-                <div className="mt-2 text-3xl font-semibold text-amber-900">
-                  {card.value.toLocaleString("sv-SE")}
-                </div>
-                <p className="text-sm text-amber-800">{card.description}</p>
+          {/* Familjeavvikelser */}
+          <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.07] p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
+                <Info className="h-4 w-4" />
               </div>
-              <div className="rounded-full bg-white/70 p-3 text-amber-600 shadow-inner">
-                <ImageOff className="h-6 w-6" aria-hidden />
-              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-indigo-400/70">
+                Avvikelse
+              </span>
             </div>
-            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-amber-100">
+            <div className="mt-4 text-3xl font-black tracking-tight text-indigo-200" style={{ letterSpacing: "-0.02em" }}>
+              {data.inconsistentFamilyCount.toLocaleString("sv-SE")}
+            </div>
+            <p className="mt-1 text-xs text-indigo-300/70">familjer med inkonsekventa specifikationer</p>
+            <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-indigo-500/15">
               <div
-                className="h-full bg-gradient-to-r from-amber-500 to-orange-400"
-                style={{ width: `${Math.min(100, Math.max(10, card.value))}%` }}
+                className="h-full rounded-full bg-indigo-400/60"
+                style={{ width: `${Math.min(100, data.inconsistentFamilyCount * 8)}%` }}
               />
             </div>
             <Link
-              href={`#${card.id}`}
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-900 underline decoration-amber-400 decoration-2 underline-offset-4"
+              href="#familjeavvikelser"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-indigo-400 no-underline transition-colors hover:text-indigo-300"
             >
-              Visa lista
-              <ArrowUpRight className="h-4 w-4" aria-hidden />
+              Visa familjer <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
-        ))}
-
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-50 bg-white p-5 shadow-[0_16px_40px_rgba(79,70,229,0.14)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-indigo-500">Avvikelser</p>
-              <div className="mt-2 text-3xl font-semibold text-slate-900">
-                {data.inconsistentFamilyCount.toLocaleString("sv-SE")}
-              </div>
-              <p className="text-sm text-slate-600">
-                Artikelfamiljer med inkonsekventa specifikationer (saknade värden i vissa artiklar).
-              </p>
-            </div>
-            <div className="rounded-full bg-indigo-50 p-3 text-indigo-500">
-              <Info className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-sky-400"
-              style={{ width: `${Math.min(100, data.inconsistentFamilyCount * 8)}%` }}
-            />
-          </div>
-          <Link
-            href="#familjeavvikelser"
-            className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
-          >
-            Visa avvikande familjer
-            <ArrowUpRight className="h-4 w-4" aria-hidden />
-          </Link>
         </div>
       </section>
 
+      {/* ── Detaljtabeller ─────────────────────────────────── */}
       <section className="space-y-6">
         <DetailTable
           id="missing-images"
@@ -157,10 +160,10 @@ export default async function DashboardPage() {
             <Link
               key={product.articleNumber}
               href={product.link || "#"}
-              className="text-sky-600 underline"
+              className="inline-flex items-center gap-1 text-xs text-sky-400 no-underline hover:text-sky-300"
               prefetch={false}
             >
-              Visa produkt
+              Visa <ArrowUpRight className="h-3 w-3" />
             </Link>,
           ])}
         />
@@ -201,6 +204,7 @@ export default async function DashboardPage() {
           ])}
         />
       </section>
+
     </div>
   );
 }
@@ -219,39 +223,47 @@ function DetailTable({
   rows: (string | number | JSX.Element)[][];
 }) {
   return (
-    <section id={id} className="space-y-3 rounded-2xl border border-slate-100 bg-white/70 p-6 shadow-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
+    <section id={id} className="overflow-hidden rounded-2xl border border-white/[0.30] bg-white/[0.16]">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.22] px-5 py-4">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-600">{description}</p>
+          <h2 className="text-sm font-semibold text-gray-100">{title}</h2>
+          <p className="mt-0.5 text-xs text-gray-400">{description}</p>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+        <span className="rounded-full border border-white/[0.30] bg-white/[0.16] px-3 py-1 text-xs font-semibold text-gray-400">
           {rows.length} st
         </span>
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-100">
-        <table className="min-w-full divide-y divide-slate-100">
-          <thead className="bg-slate-50/70">
-            <tr>
-              {columns.map((column) => (
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full">
+          <thead>
+            <tr className="border-b border-white/[0.32]">
+              {columns.map((col) => (
                 <th
-                  key={column}
+                  key={col}
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
+                  className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500"
                 >
-                  {column}
+                  {col}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-800">
+          <tbody>
             {rows.length ? (
-              rows.map((row, index) => (
-                <tr key={`${id}-${index}`} className="hover:bg-slate-50/60">
-                  {row.map((cell, cellIndex) => (
-                    <td key={`${id}-${index}-${cellIndex}`} className="px-4 py-3 align-top">
+              rows.map((row, i) => (
+                <tr
+                  key={`${id}-${i}`}
+                  className={`transition-colors hover:bg-white/[0.08] ${i !== rows.length - 1 ? "border-b border-white/[0.06]" : ""}`}
+                >
+                  {row.map((cell, ci) => (
+                    <td key={`${id}-${i}-${ci}`} className="px-5 py-3 text-xs align-top text-gray-300">
                       {typeof cell === "string" || typeof cell === "number" ? (
-                        <span className="leading-relaxed">{cell}</span>
+                        <span className={ci === 0 ? "font-mono font-semibold text-gray-200" : ""}>
+                          {cell}
+                        </span>
                       ) : (
                         cell
                       )}
@@ -261,7 +273,7 @@ function DetailTable({
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={columns.length} className="px-5 py-8 text-center text-xs text-gray-500">
                   Ingen data att visa
                 </td>
               </tr>

@@ -10,9 +10,9 @@ function normalizePackaging(value: string | null | undefined): string | null {
 }
 
 const PACKAGING_FILTER_TARGETS: Record<Exclude<PackagingFilterValue, "bulk">, string> = {
-  "small-pack": normalizePackaging("SB förpackning") ?? "sb förpackning",
-  bucket: normalizePackaging("Hink") ?? "hink",
-  package: normalizePackaging("Paket") ?? "paket",
+  "small-pack": "sb förpackning",
+  bucket: "hink",
+  package: "paket",
 };
 
 export function matchesPackagingFilter(
@@ -37,13 +37,16 @@ export function productMatchesPackagingFilters(
   product: Pick<Product, "articleNumber" | "primaryPackaging">,
   filters: Iterable<PackagingFilterValue>,
 ): boolean {
-  const filterArray = Array.from(filters);
+  let hasFilters = false;
 
-  if (filterArray.length === 0) {
-    return true;
+  for (const filter of filters) {
+    hasFilters = true;
+    if (matchesPackagingFilter(product, filter)) {
+      return true;
+    }
   }
 
-  return filterArray.some((filter) => matchesPackagingFilter(product, filter));
+  return !hasFilters;
 }
 
 export { normalizePackaging };

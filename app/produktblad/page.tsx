@@ -10,15 +10,13 @@ import {
   useState,
 } from "react";
 import type { jsPDF } from "jspdf";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
 import {
   analyzeProductTitles,
   extractSizeTokens,
   tokenizeTitle,
 } from "@/lib/product-title";
+import { Search, Plus, Trash2, FileDown, ImageOff, RotateCcw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 type Specification = {
   key: string;
@@ -138,36 +136,26 @@ function upsertSizeSpecification(specs: Specification[], sizeValue: string | nul
 }
 
 function normalizeUrl(raw: string): string {
-  // Låt data-URL:er vara
   if (!raw) return raw;
   if (raw.startsWith("data:image/")) return raw;
 
   try {
-    // Encoda path-delen, behåll query/hash
     const [base, rest] = raw.split(/([?#].*)/);
     return encodeURI(base) + (rest ?? "");
   } catch {
-    // Sista utväg: ersätt bara mellanslag
     return raw.replace(/ /g, "%20");
   }
 }
-
-// --- Bildhjälpare (rasterisera till JPEG så jsPDF aldrig ser "UNKNOWN") ---
 
 async function loadHtmlImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = reject;
-    // För data-URL behövs inte CORS
     img.src = dataUrl;
   });
 }
 
-/**
- * Tar en PdfImage (kan vara PNG/JPEG/WEBP) och rasteriserar den till JPEG.
- * Returnerar { dataUrl, width, height } baserat på bildens naturliga storlek.
- */
 async function rasterizeToJpeg(
   pdfImage: PdfImage,
   quality = 0.92
@@ -179,7 +167,6 @@ async function rasterizeToJpeg(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Kunde inte skapa 2D-kontext");
 
-  // Vit bakgrund → undvik svart vid transparenta PNG/WebP
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0);
@@ -196,7 +183,6 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
   if (!source) {
     return null;
   }
-  // Normalisera URL innan allt annat
   const src = normalizeUrl(source);
 
   const parseDataUrl = (dataUrl: string): PdfImage | null => {
@@ -229,10 +215,6 @@ async function convertImageToDataUrl(source: string): Promise<PdfImage | null> {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-
-
-
-
 
   const tryDirectFetch = async () => {
     try {
@@ -348,6 +330,9 @@ async function ensurePoppinsFonts(doc: jsPDF) {
   }
 }
 
+const inputCls = "w-full rounded-xl border border-white/[0.32] bg-white/[0.13] px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 outline-none transition-all focus:border-violet-500/50 focus:bg-white/[0.10] focus:ring-1 focus:ring-violet-500/30";
+const labelCls = "block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500 mb-1.5";
+
 export default function ProduktbladPage() {
   const [lookupId, setLookupId] = useState("");
   const [form, setForm] = useState<ProductFormData>(initialForm);
@@ -359,32 +344,6 @@ export default function ProduktbladPage() {
   const blurTimeoutRef = useRef<number | null>(null);
 
   const hasSpecs = form.specs.length > 0;
-
-  const fetchMessageStyles = useMemo(() => {
-    switch (fetchState.status) {
-      case "error":
-        return "text-sm text-danger";
-      case "success":
-        return "text-sm text-emerald-600";
-      case "loading":
-        return "text-sm text-neutral-500";
-      default:
-        return "text-sm text-neutral-500";
-    }
-  }, [fetchState.status]);
-
-  const pdfMessageStyles = useMemo(() => {
-    switch (pdfState.status) {
-      case "error":
-        return "text-sm text-danger";
-      case "success":
-        return "text-sm text-emerald-600";
-      case "loading":
-        return "text-sm text-neutral-500";
-      default:
-        return "text-sm text-neutral-500";
-    }
-  }, [pdfState.status]);
 
   const clearBlurTimeout = useCallback(() => {
     if (blurTimeoutRef.current !== null) {
@@ -720,8 +679,8 @@ export default function ProduktbladPage() {
       }
 
       const [rb, gb, bb] = brandBlue;
-doc.setFillColor(rb, gb, bb);
-doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
+      doc.setFillColor(rb, gb, bb);
+      doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       doc.setFont(baseFont, boldStyle);
       doc.setFontSize(19);
@@ -750,8 +709,7 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       if (image) {
         try {
-          // Rasterisera till JPEG och använd naturliga mått
-          const raster = await rasterizeToJpeg(image); // { dataUrl, width, height }
+          const raster = await rasterizeToJpeg(image);
 
           const maxImageWidth = 70;
           const maxImageHeight = 70;
@@ -768,7 +726,6 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
           doc.setDrawColor(226, 232, 240);
           doc.roundedRect(imageX - 1, imageY - 1, imageWidth + 2, imageHeight + 2, 3, 3);
 
-          // Lägg in som JPEG oavsett ursprungligt format
           doc.addImage(raster.dataUrl, "JPEG", imageX, imageY, imageWidth, imageHeight);
 
           imageLayout = {
@@ -1012,25 +969,34 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
   };
 
   return (
-    <div className="space-y-10 mt-10">
-      <div className="max-w-3xl space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Skapa produktblad</h1>
-        <p className="text-sm text-neutral-600">
-          Hämta artikelinformation från produktflödet, justera innehållet och spara ett färdigt
-          produktblad som PDF.
+    <div className="mx-auto max-w-4xl space-y-10">
+
+      {/* Header */}
+      <div>
+        <p className="mb-2 text-[11px] font-semibold tracking-[0.25em] text-violet-400 uppercase">
+          Verktyg
+        </p>
+        <h1 className="text-3xl font-black tracking-tight text-gray-100" style={{ letterSpacing: "-0.02em" }}>
+          Skapa produktblad
+        </h1>
+        <p className="mt-2 text-sm text-gray-400">
+          Hämta artikelinformation från produktflödet, justera innehållet och exportera ett färdigt produktblad som PDF.
         </p>
       </div>
 
-      <section className="rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-neutral-900">Hämta från artikelnummer</h2>
-        <p className="mt-1 text-sm text-neutral-600">
-          Ange artikelnumret för att fylla i produktbladet automatiskt. Du kan justera alla fält
-          efteråt.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <div className="relative">
-              <Input
+      {/* Sök / Hämta */}
+      <section className="rounded-2xl border border-white/[0.30] bg-white/[0.16]">
+        <div className="border-b border-white/[0.22] px-6 py-4">
+          <h2 className="text-sm font-semibold text-gray-200">Hämta från artikelnummer</h2>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Ange artikelnummer eller söktext för att fylla i produktbladet automatiskt.
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              <input
                 value={lookupId}
                 onChange={(event) => {
                   setLookupId(event.target.value);
@@ -1039,19 +1005,21 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
                 onFocus={handleLookupFocus}
                 onBlur={handleLookupBlur}
                 onKeyDown={handleLookupKeyDown}
-                placeholder="Till exempel 12345 eller grind"
+                placeholder="Till exempel 12345 eller grind…"
                 aria-label="Artikelnummer eller söktext att hämta"
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={showSuggestions && suggestions.length > 0}
                 aria-controls="produktblad-article-suggestions"
                 autoComplete="off"
+                className="w-full rounded-xl border border-white/[0.32] bg-white/[0.13] py-2.5 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-600 outline-none transition-all focus:border-violet-500/50 focus:bg-white/[0.10] focus:ring-1 focus:ring-violet-500/30"
               />
-              {showSuggestions && suggestions.length > 0 ? (
+              {showSuggestions && suggestions.length > 0 && (
                 <ul
                   id="produktblad-article-suggestions"
                   role="listbox"
-                  className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-neutral-200 bg-white shadow-lg"
+                  className="absolute z-20 mt-1.5 max-h-60 w-full overflow-auto rounded-2xl border border-white/[0.30] shadow-2xl shadow-black/40"
+                  style={{ background: "#13142a" }}
                 >
                   {suggestions.map((suggestion, index) => {
                     const isActive = index === activeSuggestionIndex;
@@ -1061,10 +1029,10 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
                           type="button"
                           role="option"
                           aria-selected={isActive}
-                          className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm ${
+                          className={`flex w-full flex-col items-start px-4 py-2.5 text-left text-sm transition-colors ${
                             isActive
-                              ? "bg-neutral-100 text-neutral-900"
-                              : "text-neutral-700 hover:bg-neutral-50"
+                              ? "bg-violet-500/15 text-gray-100"
+                              : "text-gray-300 hover:bg-white/[0.13]"
                           }`}
                           onMouseDown={(event) => {
                             event.preventDefault();
@@ -1072,208 +1040,266 @@ doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
                           }}
                           onClick={() => handleSelectSuggestion(suggestion)}
                         >
-                          <span className="font-medium text-neutral-900">
+                          <span className="font-mono text-xs font-semibold text-violet-300">
                             {suggestion.articleNumber}
                           </span>
-                          <span className="text-xs text-neutral-500">{suggestion.title}</span>
+                          <span className="text-xs text-gray-500">{suggestion.title}</span>
                         </button>
                       </li>
                     );
                   })}
                 </ul>
-              ) : null}
+              )}
             </div>
+            <button
+              onClick={() => void handleLookup()}
+              disabled={fetchState.status === "loading"}
+              className="flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {fetchState.status === "loading" ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Hämtar…</>
+              ) : (
+                "Hämta uppgifter"
+              )}
+            </button>
           </div>
-          <Button onClick={() => void handleLookup()} disabled={fetchState.status === "loading"}>
-            {fetchState.status === "loading" ? "Hämtar..." : "Hämta uppgifter"}
-          </Button>
+
+          {fetchState.message && (
+            <div className={`mt-3 flex items-center gap-2 text-xs ${
+              fetchState.status === "error" ? "text-red-400" :
+              fetchState.status === "success" ? "text-emerald-400" : "text-gray-500"
+            }`}>
+              {fetchState.status === "error" && <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              {fetchState.status === "success" && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+              {fetchState.message}
+            </div>
+          )}
         </div>
-        {fetchState.message ? (
-          <p className={`${fetchMessageStyles} mt-2`}>{fetchState.message}</p>
-        ) : null}
       </section>
 
-      <section className="space-y-8 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Artikelnummer</label>
-              <Input
-                className="mt-1"
-                value={form.articleNumber}
-                onChange={(event) => {
-                  handleFormChange("articleNumber", event.target.value);
-                  setLookupId(event.target.value);
-                }}
-                placeholder="Fyll i artikelnummer"
-              />
+      {/* Formulär */}
+      <section className="overflow-hidden rounded-2xl border border-white/[0.30] bg-white/[0.16]">
+        <div className="border-b border-white/[0.22] px-6 py-4">
+          <h2 className="text-sm font-semibold text-gray-200">Produktinformation</h2>
+          <p className="mt-0.5 text-xs text-gray-500">Justera fälten innan du skapar PDF:en.</p>
+        </div>
+
+        <div className="p-6 space-y-8">
+          {/* Tvåkolumnsgrid */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Vänster: basdata */}
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Artikelnummer</label>
+                <input
+                  className={inputCls}
+                  value={form.articleNumber}
+                  onChange={(event) => {
+                    handleFormChange("articleNumber", event.target.value);
+                    setLookupId(event.target.value);
+                  }}
+                  placeholder="Fyll i artikelnummer"
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Benämning</label>
+                <input
+                  className={inputCls}
+                  value={form.title}
+                  onChange={(event) => handleFormChange("title", event.target.value)}
+                  placeholder="Skriv benämning"
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Länk till webbshop</label>
+                <input
+                  className={inputCls}
+                  value={form.link}
+                  onChange={(event) => handleFormChange("link", event.target.value)}
+                  placeholder="https://"
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Vikt</label>
+                <input
+                  className={inputCls}
+                  value={form.weight}
+                  onChange={(event) => handleFormChange("weight", event.target.value)}
+                  placeholder="Till exempel 3 kg"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Benämning</label>
-              <Input
-                className="mt-1"
-                value={form.title}
-                onChange={(event) => handleFormChange("title", event.target.value)}
-                placeholder="Skriv benämning"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Länk till webbshop</label>
-              <Input
-                className="mt-1"
-                value={form.link}
-                onChange={(event) => handleFormChange("link", event.target.value)}
-                placeholder="https://"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Vikt</label>
-              <Input
-                className="mt-1"
-                value={form.weight}
-                onChange={(event) => handleFormChange("weight", event.target.value)}
-                placeholder="Till exempel 3 kg"
-              />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Bildadress</label>
-              <Input
-                className="mt-1"
-                value={form.image}
-                onChange={(event) => handleFormChange("image", event.target.value)}
-                placeholder="Klistra in bild-URL eller ladda upp nedan"
-              />
-              <p className="mt-1 text-xs text-neutral-500">
-                Om bilden saknas eller är felaktig kan du ange en ny webbadress eller ladda upp en
-                ersättningsbild.
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Ladda upp ny bild</label>
-              <input
-                className="mt-1 block w-full rounded-2xl border border-dashed border-neutral-300 bg-white/60 px-4 py-3 text-sm text-neutral-700 focus:border-primary focus:outline-none"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Förhandsgranskning</label>
-              <div className="mt-1 flex h-48 items-center justify-center overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50">
+
+            {/* Höger: bild & logotyp */}
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Bildadress</label>
+                <input
+                  className={inputCls}
+                  value={form.image}
+                  onChange={(event) => handleFormChange("image", event.target.value)}
+                  placeholder="Klistra in bild-URL eller ladda upp nedan"
+                />
+                <p className="mt-1.5 text-[11px] text-gray-600">
+                  Om bilden saknas kan du ange en ny URL eller ladda upp en ersättningsbild.
+                </p>
+              </div>
+
+              <div>
+                <label className={labelCls}>Ladda upp bild</label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/[0.32] bg-white/[0.08] px-4 py-3 text-sm text-gray-500 transition-colors hover:border-violet-500/40 hover:text-gray-400">
+                  <ImageOff className="h-4 w-4 shrink-0" />
+                  <span>Välj bildfil…</span>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="sr-only" />
+                </label>
+              </div>
+
+              {/* Bildförhandsgranskning */}
+              <div className="flex h-40 items-center justify-center overflow-hidden rounded-xl border border-white/[0.12] bg-white/[0.08]">
                 {form.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={form.image} alt="Produktbild" className="h-full w-full object-contain" />
                 ) : (
-                  <span className="text-sm text-neutral-400">Ingen bild vald ännu</span>
+                  <span className="text-xs text-gray-600">Ingen bild vald ännu</span>
                 )}
               </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-neutral-700">Logotyp</label>
-              <input
-                className="mt-1 block w-full rounded-2xl border border-dashed border-neutral-300 bg-white/60 px-4 py-3 text-sm text-neutral-700 focus:border-primary focus:outline-none"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-              />
-              <p className="mt-1 text-xs text-neutral-500">
-                Ladda upp en egen logotyp som ersätter standardlogotypen i produktbladet.
-              </p>
-              <div className="mt-3 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white/60 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  {form.logo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={form.logo}
-                      alt="Logotyp"
-                      className="h-10 w-auto max-w-[140px] object-contain"
-                    />
-                  ) : (
-                    <span className="text-xs text-neutral-400">Ingen logotyp vald</span>
-                  )}
+
+              {/* Logotyp */}
+              <div>
+                <label className={labelCls}>Logotyp i PDF</label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/[0.32] bg-white/[0.08] px-4 py-3 text-sm text-gray-500 transition-colors hover:border-violet-500/40 hover:text-gray-400">
+                  <span>Ladda upp egen logotyp…</span>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="sr-only" />
+                </label>
+                <p className="mt-1.5 text-[11px] text-gray-600">
+                  Ersätter standardlogotypen i det exporterade produktbladet.
+                </p>
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.12] bg-white/[0.08] px-4 py-3">
+                  <div className="flex items-center">
+                    {form.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={form.logo}
+                        alt="Logotyp"
+                        className="h-8 w-auto max-w-[120px] object-contain brightness-0 invert opacity-80"
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-600">Ingen logotyp</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetLogo}
+                    disabled={form.logo === LOGO_IMAGE_PATH}
+                    className="flex items-center gap-1.5 rounded-lg border border-white/[0.14] px-2.5 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-white/[0.24] hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Återställ
+                  </button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleResetLogo}
-                  disabled={form.logo === LOGO_IMAGE_PATH}
-                >
-                  Återställ
-                </Button>
               </div>
             </div>
           </div>
-        </div>
 
-        <div>
-          <label className="text-sm font-medium text-neutral-700">Beskrivning</label>
-          <Textarea
-            className="mt-2"
-            value={form.description}
-            onChange={(event) => handleFormChange("description", event.target.value)}
-            placeholder="Skriv eller klistra in produktbeskrivningen här"
-          />
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-neutral-900">Specifikationer</h3>
-            <Button variant="outline" size="sm" onClick={handleAddSpec}>
-              Lägg till specifikation
-            </Button>
+          {/* Beskrivning */}
+          <div>
+            <label className={labelCls}>Beskrivning</label>
+            <textarea
+              rows={5}
+              className={`${inputCls} resize-none`}
+              value={form.description}
+              onChange={(event) => handleFormChange("description", event.target.value)}
+              placeholder="Skriv eller klistra in produktbeskrivningen här"
+            />
           </div>
-          {hasSpecs ? (
-            <div className="space-y-4">
-              {form.specs.map((spec, index) => (
-                <div
-                  key={`spec-${index}`}
-                  className="grid gap-3 rounded-2xl border border-neutral-200 bg-white/70 p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto]"
-                >
-                  <Input
-                    value={spec.key}
-                    onChange={(event) => handleSpecChange(index, "key", event.target.value)}
-                    onKeyDown={(event) => handleSpecKeyDown(event, index)}
-                    placeholder="Specifikation"
-                    aria-label={`Specifikation ${index + 1}`}
-                  />
-                  <Input
-                    value={spec.value}
-                    onChange={(event) => handleSpecChange(index, "value", event.target.value)}
-                    onKeyDown={(event) => handleSpecKeyDown(event, index)}
-                    placeholder="Värde"
-                    aria-label={`Värde för specifikation ${index + 1}`}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="justify-self-end text-danger"
-                    onClick={() => handleRemoveSpec(index)}
-                  >
-                    Ta bort
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-neutral-200 bg-white/50 p-4 text-sm text-neutral-500">
-              Inga specifikationer ännu. Lägg till de egenskaper du vill visa i produktbladet.
-            </p>
-          )}
-        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {pdfState.message ? <p className={pdfMessageStyles}>{pdfState.message}</p> : <span />}
-          <Button
-            onClick={() => void handleGeneratePdf()}
-            disabled={pdfState.status === "loading"}
-            className="self-end"
-          >
-            {pdfState.status === "loading" ? "Skapar PDF..." : "Spara produktblad som PDF"}
-          </Button>
+          {/* Specifikationer */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-200">Specifikationer</h3>
+                <p className="text-[11px] text-gray-600">{form.specs.length} st tillagda</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddSpec}
+                className="flex items-center gap-1.5 rounded-xl border border-white/[0.30] bg-white/[0.13] px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:bg-white/[0.12] hover:text-gray-100"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Lägg till
+              </button>
+            </div>
+
+            {hasSpecs ? (
+              <div className="space-y-2">
+                {form.specs.map((spec, index) => (
+                  <div
+                    key={`spec-${index}`}
+                    className="grid items-center gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                  >
+                    <input
+                      value={spec.key}
+                      onChange={(event) => handleSpecChange(index, "key", event.target.value)}
+                      onKeyDown={(event) => handleSpecKeyDown(event, index)}
+                      placeholder="Egenskap"
+                      aria-label={`Specifikation ${index + 1}`}
+                      className={inputCls}
+                    />
+                    <input
+                      value={spec.value}
+                      onChange={(event) => handleSpecChange(index, "value", event.target.value)}
+                      onKeyDown={(event) => handleSpecKeyDown(event, index)}
+                      placeholder="Värde"
+                      aria-label={`Värde för specifikation ${index + 1}`}
+                      className={inputCls}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSpec(index)}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      aria-label="Ta bort specifikation"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/[0.12] bg-white/[0.03] p-5 text-center">
+                <p className="text-sm text-gray-600">
+                  Inga specifikationer ännu. Lägg till egenskaper som ska visas i produktbladet.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* PDF-knapp */}
+          <div className="flex flex-col gap-3 border-t border-white/[0.22] pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {pdfState.message && (
+                <div className={`flex items-center gap-2 text-xs ${
+                  pdfState.status === "error" ? "text-red-400" :
+                  pdfState.status === "success" ? "text-emerald-400" : "text-gray-500"
+                }`}>
+                  {pdfState.status === "error" && <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+                  {pdfState.status === "success" && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+                  {pdfState.status === "loading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />}
+                  {pdfState.message}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => void handleGeneratePdf()}
+              disabled={pdfState.status === "loading"}
+              className="flex items-center gap-2 rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:translate-y-0"
+            >
+              {pdfState.status === "loading" ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Skapar PDF…</>
+              ) : (
+                <><FileDown className="h-4 w-4" /> Spara produktblad som PDF</>
+              )}
+            </button>
+          </div>
         </div>
       </section>
     </div>

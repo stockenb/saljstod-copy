@@ -1,7 +1,7 @@
 import "../styles/globals.css";
 import { ReactNode } from "react";
-
 import { Navbar } from "@/components/navbar";
+import { Footer } from "@/components/footer";
 import { site } from "@/config/site";
 
 export const metadata = {
@@ -12,12 +12,12 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="sv" suppressHydrationWarning>
-      <body>
+      <body className="flex min-h-screen flex-col" style={{ background: "#11121f" }}>
         <Navbar />
-        <main className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-10 ">{children}</main>
-        <footer className="mx-auto w-full max-w-7xl px-6 pb-8 text-sm text-neutral-500 sm:px-8 lg:px-10 mt-20">
-          © {new Date().getFullYear()} Säljstöd Nils Ahlgren AB. All rights reserved.
-        </footer>
+        <main className="w-full flex-1 px-6 py-10 sm:px-8 lg:px-10">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   );

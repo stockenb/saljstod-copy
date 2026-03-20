@@ -3,12 +3,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { jsPDF } from "jspdf";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { buildSortableArticle, compareSortableArticles } from "@/lib/article-sorting";
 import { sanitizePdfText, sanitizePdfTextArray } from "@/lib/pdf/text";
 import { analyzeProductTitles } from "@/lib/product-title";
+import { X, Plus, FileDown, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 type Specification = {
   key: string;
@@ -320,6 +318,8 @@ function normalizeArticleNumbers(raw: string): string[] {
     .filter(Boolean);
 }
 
+const inputCls = "w-full rounded-xl border border-white/[0.18] bg-white/[0.07] px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 outline-none transition-all focus:border-violet-500/50 focus:bg-white/[0.10] focus:ring-1 focus:ring-violet-500/30";
+
 export default function CombinedProductSheetClientPage() {
   const searchParams = useSearchParams();
   const artiklarParam = searchParams.get("artiklar");
@@ -382,32 +382,6 @@ export default function CombinedProductSheetClientPage() {
       ].join(" "),
     [],
   );
-
-  const fetchMessageStyles = useMemo(() => {
-    switch (fetchState.status) {
-      case "error":
-        return "text-sm text-danger";
-      case "success":
-        return "text-sm text-emerald-600";
-      case "loading":
-        return "text-sm text-neutral-500";
-      default:
-        return "text-sm text-neutral-500";
-    }
-  }, [fetchState.status]);
-
-  const pdfMessageStyles = useMemo(() => {
-    switch (pdfState.status) {
-      case "error":
-        return "text-sm text-danger";
-      case "success":
-        return "text-sm text-emerald-600";
-      case "loading":
-        return "text-sm text-neutral-500";
-      default:
-        return "text-sm text-neutral-500";
-    }
-  }, [pdfState.status]);
 
   const fetchProductsForNumbers = useCallback(async (numbers: string[]) => {
     if (numbers.length === 0) {
@@ -589,7 +563,6 @@ export default function CombinedProductSheetClientPage() {
       doc.roundedRect(marginX, headerTop, contentWidth, 26, 4, 4, "F");
 
       doc.setFont(baseFont, boldStyle);
-      // Ändra värdet nedan för att justera rubrikens textstorlek i det samlade produktbladet.
       doc.setFontSize(22);
       doc.setTextColor(255, 255, 255);
       const pdfTitle = sanitizePdfText(combinedTitle || "Samlat produktblad");
@@ -602,23 +575,6 @@ export default function CombinedProductSheetClientPage() {
 
       let currentY = headerTop + 34;
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-
-      /*const articleNumbers = products.map((product) => product.articleNumber).filter(Boolean);
-      if (articleNumbers.length > 0) {
-        doc.setFont(baseFont, boldStyle);
-        doc.setFontSize(13);
-        doc.setTextColor(headingColor[0], headingColor[1], headingColor[2]);
-        doc.text("Artiklar i produktfamiljen", marginX, currentY);
-        currentY += 6;
-
-        doc.setFont(baseFont, normalStyle);
-        doc.setFontSize(10.5);
-        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        const articleLines = doc.splitTextToSize(articleNumbers.join(", "), contentWidth);
-        const lineHeight = (doc.getFontSize() * doc.getLineHeightFactor()) / doc.internal.scaleFactor;
-        doc.text(articleLines, marginX, currentY);
-        currentY += articleLines.length * lineHeight + 6;
-      }*/
 
       const image = await convertImageToDataUrl(sharedImage);
       const columnGap = 12;
@@ -983,126 +939,180 @@ export default function CombinedProductSheetClientPage() {
   };
 
   return (
-    <div className="space-y-10 mt-10">
-      <div className="max-w-3xl space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Skapa samlat produktblad</h1>
-        <p className="text-sm text-neutral-600">
+    <div className="mx-auto max-w-5xl space-y-10">
+
+      {/* Header */}
+      <div>
+        <p className="mb-2 text-[11px] font-semibold tracking-[0.25em] text-violet-400 uppercase">
+          Verktyg
+        </p>
+        <h1 className="text-3xl font-black tracking-tight text-gray-100" style={{ letterSpacing: "-0.02em" }}>
+          Samlat produktblad
+        </h1>
+        <p className="mt-2 text-sm text-gray-400">
           Ange flera artikelnummer för att skapa ett samlat produktblad för en hel produktfamilj.
         </p>
       </div>
 
-      <section className="space-y-6 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-neutral-900">Artikelnummer</h2>
-          <p className="text-sm text-neutral-600">
-            Klistra in artikelnummer för de produkter som ska ingå. Vi hämtar informationen åt dig.
+      {/* Artikelnummer-sektion */}
+      <section className="overflow-hidden rounded-2xl border border-white/[0.16] bg-white/[0.09]">
+        <div className="border-b border-white/[0.10] px-6 py-4">
+          <h2 className="text-sm font-semibold text-gray-200">Artikelnummer</h2>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Klistra in artikelnummer för de produkter som ska ingå — separera med komma, mellanslag eller radbrytning.
           </p>
         </div>
-        <form onSubmit={handleFetchProducts} className="space-y-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-neutral-700" htmlFor="article-input">
-              Artikelnummer
-            </label>
-            <Textarea
-              id="article-input"
-              rows={4}
-              value={articleInput}
-              onChange={(event) => setArticleInput(event.target.value)}
-              placeholder="Exempel: 12345, 12346, 12347"
-            />
-            <p className="text-xs text-neutral-500">
-              Separera artikelnummer med komma, mellanslag eller radbrytningar.
-            </p>
-          </div>
+        <form onSubmit={handleFetchProducts} className="p-6 space-y-4">
+          <textarea
+            id="article-input"
+            rows={4}
+            value={articleInput}
+            onChange={(event) => setArticleInput(event.target.value)}
+            placeholder="Exempel: 12345, 12346, 12347"
+            className={`${inputCls} resize-none`}
+          />
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <Button type="submit" className="w-full sm:w-auto">
-              Hämta artiklar
-            </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {fetchState.message && (
+                <div className={`flex items-start gap-2 text-xs ${
+                  fetchState.status === "error" ? "text-red-400" :
+                  fetchState.status === "success" ? "text-emerald-400" : "text-gray-500"
+                }`}>
+                  {fetchState.status === "error" && <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+                  {fetchState.status === "success" && <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+                  {fetchState.status === "loading" && <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />}
+                  <span className="whitespace-pre-line">{fetchState.message}</span>
+                </div>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={fetchState.status === "loading"}
+              className="flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50 sm:self-end"
+            >
+              {fetchState.status === "loading" ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Hämtar…</>
+              ) : (
+                "Hämta artiklar"
+              )}
+            </button>
           </div>
         </form>
-        {fetchState.message ? <p className={`${fetchMessageStyles} mt-1`}>{fetchState.message}</p> : null}
       </section>
 
-      {hasProducts ? (
-        <section className="space-y-6 rounded-3xl border border-neutral-200 bg-white/90 p-6 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-semibold text-neutral-900">Artiklar</h2>
-            <div className="flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-              {pdfState.message ? <p className={pdfMessageStyles}>{pdfState.message}</p> : <span className="hidden sm:block" />}
-              <Button type="button" onClick={handleGeneratePdf} variant="secondary" className="w-full sm:w-auto">
-                Skapa samlat produktblad
-              </Button>
+      {/* Artiklar-sektion */}
+      {hasProducts && (
+        <section className="overflow-hidden rounded-2xl border border-white/[0.16] bg-white/[0.09]">
+          {/* Header med PDF-knapp */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.10] px-6 py-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-200">
+                Artiklar <span className="ml-1.5 rounded-full border border-white/[0.14] bg-white/[0.07] px-2 py-0.5 text-[11px] font-semibold text-gray-400">{products.length} st</span>
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              {pdfState.message && (
+                <div className={`flex items-center gap-1.5 text-xs ${
+                  pdfState.status === "error" ? "text-red-400" :
+                  pdfState.status === "success" ? "text-emerald-400" : "text-gray-500"
+                }`}>
+                  {pdfState.status === "error" && <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+                  {pdfState.status === "success" && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+                  {pdfState.status === "loading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />}
+                  {pdfState.message}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleGeneratePdf}
+                disabled={pdfState.status === "loading"}
+                className="flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:translate-y-0"
+              >
+                {pdfState.status === "loading" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Skapar…</>
+                ) : (
+                  <><FileDown className="h-4 w-4" /> Skapa PDF</>
+                )}
+              </button>
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="p-6 space-y-8">
+            {/* Specifikationsfilter */}
             <div className="space-y-3">
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">Specifikationer</h3>
-                <p className="text-sm text-neutral-600">
-                  Välj vilka specifikationer som ska visas i listan och i PDF:en.
+              <div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                  Specifikationer i PDF
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-600">
+                  Klicka för att dölja/visa specifikationer.
                 </p>
               </div>
-              {visibleSpecLabels.length > 0 ? (
+
+              {visibleSpecLabels.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {visibleSpecLabels.map((label) => (
-                    <div
-                      key={label}
-                      className="flex items-center gap-2 rounded-full bg-neutral-100 px-3 py-1 text-sm text-neutral-700"
-                    >
-                      <span>{label}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs font-medium text-neutral-500 hover:text-danger"
-                        onClick={() => handleHideSpec(label)}
-                      >
-                        Ta bort
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-neutral-500">Inga specifikationer valda. Lägg till en nedan.</p>
-              )}
-              {hiddenSpecLabels.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {hiddenSpecLabels.map((label) => (
-                    <Button
+                    <button
                       key={label}
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full px-3 text-xs font-semibold"
-                      onClick={() => handleShowSpec(label)}
+                      onClick={() => handleHideSpec(label)}
+                      className="group flex items-center gap-1.5 rounded-full border border-white/[0.16] bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
                     >
-                      Lägg till {label}
-                    </Button>
+                      {label}
+                      <X className="h-3 w-3 opacity-50 group-hover:opacity-100" />
+                    </button>
                   ))}
                 </div>
-              ) : null}
+              )}
+
+              {hiddenSpecLabels.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {hiddenSpecLabels.map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => handleShowSpec(label)}
+                      className="flex items-center gap-1.5 rounded-full border border-dashed border-white/[0.12] px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-violet-500/40 hover:text-violet-400"
+                    >
+                      <Plus className="h-3 w-3" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {visibleSpecLabels.length === 0 && hiddenSpecLabels.length === 0 && (
+                <p className="text-xs text-gray-600">Inga specifikationer tillgängliga.</p>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-neutral-700" htmlFor="shared-description">
-                Produktbeskrivning
+            {/* Delad beskrivning */}
+            <div className="space-y-1.5">
+              <label htmlFor="shared-description" className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500">
+                Gemensam produktbeskrivning
               </label>
-              <Textarea
+              <textarea
                 id="shared-description"
                 rows={4}
                 value={sharedDescription}
                 onChange={(event) => setSharedDescription(event.target.value)}
-                placeholder="Beskrivning som gäller för alla artiklar."
+                placeholder="Beskrivning som gäller för alla artiklar i PDF:en."
+                className={`${inputCls} resize-none`}
               />
             </div>
 
+            {/* Produktlista */}
             <div className="space-y-2">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                Produkter
+              </h3>
+
               <div className="overflow-x-auto">
                 <div className="min-w-full space-y-2">
+                  {/* Kolumnhuvud */}
                   <div
-                    className="grid items-center gap-3 rounded-2xl bg-neutral-100 p-3 text-xs font-semibold uppercase tracking-wide text-neutral-500"
+                    className="grid items-center gap-3 rounded-xl bg-white/[0.05] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-gray-500"
                     style={{ gridTemplateColumns: articleGridTemplate }}
                   >
                     <span>Artikelnummer</span>
@@ -1111,6 +1121,8 @@ export default function CombinedProductSheetClientPage() {
                     <span>Antal i primärförp.</span>
                     <span className="text-right">Ta bort</span>
                   </div>
+
+                  {/* Rader */}
                   {products.map((product, index) => {
                     const specMap = new Map<string, string>();
                     product.specs.forEach((spec) => {
@@ -1118,37 +1130,37 @@ export default function CombinedProductSheetClientPage() {
                     });
 
                     const primaryPackaging =
-                      getSpecValue(specMap, (label) => isPrimaryPackagingTypeLabel(label)) ?? "-";
+                      getSpecValue(specMap, (label) => isPrimaryPackagingTypeLabel(label)) ?? "–";
                     const primaryPackagingQuantity =
-                      getSpecValue(
-                        specMap,
-                        (label) => isPrimaryPackagingQuantityLabel(label),
-                      ) ?? "-";
+                      getSpecValue(specMap, (label) => isPrimaryPackagingQuantityLabel(label)) ?? "–";
 
                     return (
                       <div
                         key={product.articleNumber}
-                        className="grid items-center gap-3 rounded-2xl border border-neutral-200 bg-white/80 p-3 shadow-sm"
+                        className="grid items-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.05] px-4 py-3 transition-colors hover:bg-white/[0.08]"
                         style={{ gridTemplateColumns: articleGridTemplate }}
                       >
-                        <div className="text-sm font-semibold text-neutral-900">{product.articleNumber}</div>
-                        <Input
+                        <span className="font-mono text-sm font-semibold text-violet-300">
+                          {product.articleNumber}
+                        </span>
+                        <input
                           id={`title-${product.articleNumber}`}
                           value={product.title}
                           onChange={(event) => updateProductField(index, "title", event.target.value)}
                           placeholder="Benämning"
+                          className="rounded-lg border border-white/[0.14] bg-white/[0.07] px-2.5 py-1.5 text-sm text-gray-200 placeholder-gray-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
                         />
-                        <div className="text-sm text-neutral-700">{primaryPackaging}</div>
-                        <div className="text-sm text-neutral-700">{primaryPackagingQuantity}</div>
+                        <span className="text-sm text-gray-400">{primaryPackaging}</span>
+                        <span className="text-sm text-gray-400">{primaryPackagingQuantity}</span>
                         <div className="flex justify-end">
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
                             onClick={() => handleRemoveProduct(index)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            aria-label="Ta bort artikel"
                           >
-                            Ta bort
-                          </Button>
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -1158,7 +1170,7 @@ export default function CombinedProductSheetClientPage() {
             </div>
           </div>
         </section>
-      ) : null}
+      )}
     </div>
   );
 }
