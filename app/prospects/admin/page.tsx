@@ -47,7 +47,6 @@ export default function ProspectsAdminPage() {
   const [loading, setLoading] = useState(true);
   const { isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     if (authLoading) return;
@@ -56,6 +55,7 @@ export default function ProspectsAdminPage() {
   }, [isAdmin, authLoading]);
 
   async function fetchAll() {
+    const supabase = createClient();
     setLoading(true);
 
     // Hämta alla prospects (admins har SELECT-policy för alla)
@@ -68,7 +68,7 @@ export default function ProspectsAdminPage() {
 
     // Hämta användarinfo från profiles
     const userIds = [...new Set(allProspects.map((p) => p.user_id))];
-    const { data: profilesData } = await supabase
+    const { data: profilesData } = await createClient()
       .from("profiles")
       .select("id, email, name")
       .in("id", userIds);

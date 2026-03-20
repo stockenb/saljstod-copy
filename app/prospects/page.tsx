@@ -89,7 +89,6 @@ export default function ProspectsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, isAdmin } = useAuth();
-  const supabase = createClient();
 
   useEffect(() => {
     if (!user) return;
@@ -97,6 +96,7 @@ export default function ProspectsPage() {
   }, [user]);
 
   async function fetchProspects() {
+    const supabase = createClient();
     setLoading(true);
     const { data } = await supabase
       .from("prospects")
@@ -108,6 +108,7 @@ export default function ProspectsPage() {
   }
 
   async function addRow() {
+    const supabase = createClient();
     const { data } = await supabase
       .from("prospects")
       .insert({ user_id: user!.id, company_name: "", city: "", contact_person: "", comment: "", status: "none" })
@@ -118,11 +119,13 @@ export default function ProspectsPage() {
 
   async function updateField(id: string, field: keyof Omit<Prospect, "id">, value: string) {
     setProspects((prev) => prev.map((p) => p.id === id ? { ...p, [field]: value } : p));
+    const supabase = createClient();
     await supabase.from("prospects").update({ [field]: value }).eq("id", id);
   }
 
   async function deleteRow(id: string) {
     setProspects((prev) => prev.filter((p) => p.id !== id));
+    const supabase = createClient();
     await supabase.from("prospects").delete().eq("id", id);
   }
 
